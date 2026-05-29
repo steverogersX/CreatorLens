@@ -13,6 +13,10 @@ npm run build
 
 # Run compiled output
 npm start
+
+# Dev scripts (run directly, no compilation)
+npm run script:test-transcript   # fetch + print transcript for two YouTube URLs
+npm run script:test-meta         # fetch + print video metadata for two YouTube URLs
 ```
 
 ## Architecture
@@ -38,18 +42,36 @@ All external data sources (transcript providers, video metadata platforms) must 
 
 ### Transcript
 
-- Unified type: `ITranscript` in `src/types/transcript.ts`
+- Unified type: `ITranscript` — derived from `TranscriptSchema` in `src/types/transcript.ts` via `z.infer<>`
 - Abstract base: `TranscriptAdapter<TRaw>` in `src/adapters/transcript/base.ts`
 - Concrete adapters live in `src/adapters/transcript/<provider>.adapter.ts`
-- Existing: `WhisperAdapter` — converts Whisper raw output (`avg_logprob` → confidence via `Math.exp()`, `probability` → word confidence)
+- Existing adapters:
+  - `YouTubeTranscriptAdapter` — maps yt-dlp JSON3 caption format (`events[].segs`) to `ITranscript`; populates `words` array using `tOffsetMs` for word-level timing
+  - `WhisperAdapter` — maps Whisper raw output; `avg_logprob` → confidence via `Math.exp()`, `probability` → word confidence
+- After `adapt()`, always validate with `TranscriptSchema.parse()` in the service — catches any adapter bugs at runtime
 
 ### Video Metadata
 
 - Unified type: `IVideoMeta` + `VideoCreator` in `src/types/video-meta.ts`
 - Abstract base: `VideoMetaAdapter<TRaw>` in `src/adapters/video-meta/base.ts`
 - Concrete adapters live in `src/adapters/video-meta/<provider>.adapter.ts`
-- Existing: `YouTubeAdapter` — maps YouTube Data API v3 response; parses ISO 8601 duration to seconds, extracts `#`-prefixed tags as hashtags
+- Existing adapters:
+  - `YtDlpVideoMetaAdapter` — maps `VideoInfo` from `ytdlp-nodejs`; `upload_date` is `YYYYMMDD` string → `Date`, tags are prefixed with `#` if not already
 - `commentCount` is always a `number` (count metric). A full comment thread system is separate.
+
+### YouTube service (`src/services/youtube.service.ts`)
+
+Three exported functions — all use `ytdlp.getInfoAsync<"video">` as the data source:
+
+| Function | Returns | Status |
+|---|---|---|
+| `getYouTubeTranscript(url)` | `ITranscript` | Working — falls back to `// TODO: Whisper` if no captions |
+| `getYouTubeMetadata(url)` | `IVideoMeta` | Working |
+| `analyzeYouTubeVideo(url)` | `VideoAnalysis` | Calls both in `Promise.all` |
+
+### Utils (`src/utils/`)
+
+- `captions.ts` — `fetchCaptionJson3(info: VideoInfo)` — picks best language (`en` → `en-*` → first available), fetches JSON3 subtitle URL, returns `{ content, lang } | null`; returns `null` (never throws) when no captions exist
 
 ### Rules for all adapters
 
