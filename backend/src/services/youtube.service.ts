@@ -1,35 +1,42 @@
-import { YoutubeTranscript } from "youtube-transcript";
-import { YouTubeTranscriptAdapter } from "@/adapters/transcript/youtube.adapter";
+import { YtDlp } from "ytdlp-nodejs";
+import { YouTubeTranscriptAdapter, type YouTubeJson3 } from "@/adapters/transcript/youtube.adapter";
+import { YtDlpVideoMetaAdapter } from "@/adapters/video-meta/ytdlp.adapter";
 import { TranscriptSchema } from "@/types/transcript";
 import type { IVideoMeta } from "@/types/video-meta";
 import type { ITranscript } from "@/types/transcript";
-import { BadRequestError } from "@/errors/app-error";
+import { fetchCaptionJson3 } from "@/utils/captions";
 
 export interface VideoAnalysis {
   meta: IVideoMeta;
   transcript: ITranscript;
 }
 
-function extractVideoId(url: string): string {
-  const match = url.match(/(?:v=|youtu\.be\/)([^&?/]+)/);
-  if (!match) throw new BadRequestError("Invalid YouTube URL");
-  return match[1];
+const ytdlp = new YtDlp();
+const transcriptAdapter = new YouTubeTranscriptAdapter();
+const metaAdapter = new YtDlpVideoMetaAdapter();
+
+export async function getYouTubeTranscript(url: string): Promise<ITranscript> {
+  const info = await ytdlp.getInfoAsync<"video">(url);
+  const captions = await fetchCaptionJson3(info);
+
+  if (captions) {
+    const raw: YouTubeJson3 = { ...(JSON.parse(captions.content) as YouTubeJson3), language: captions.lang };
+    return TranscriptSchema.parse(transcriptAdapter.adapt(raw));
+  } else {
+    // TODO: fall back to audio download + Whisper transcription
+    throw new Error("No captions available for this video");
+  }
 }
 
-const adapter = new YouTubeTranscriptAdapter();
+export async function getYouTubeMetadata(url: string): Promise<IVideoMeta> {
+  const info = await ytdlp.getInfoAsync<"video">(url);
+  return metaAdapter.adapt(info);
+}
 
 export async function analyzeYouTubeVideo(url: string): Promise<VideoAnalysis> {
-  const videoId = extractVideoId(url);
-
-  const raw = await YoutubeTranscript.fetchTranscript(videoId);
-
-  if (raw && raw.length > 0) {
-    console.log(`[transcript] found ${raw.length} segment(s) for ${videoId}`);
-  }
-
-  const transcript = TranscriptSchema.parse(adapter.adapt(raw));
-
-  console.log(`[transcript] validated — provider: ${transcript.provider}, language: ${transcript.language}, duration: ${transcript.duration}s, segments: ${transcript.segments.length}`);
-
-  throw new Error("Not implemented: meta");
+  const [transcript, meta] = await Promise.all([
+    getYouTubeTranscript(url),
+    getYouTubeMetadata(url),
+  ]);
+  return { meta, transcript };
 }
