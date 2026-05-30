@@ -1,4 +1,4 @@
-import type { ITranscript, TranscriptSegment, TranscriptWord } from "@/types/transcript";
+import type { ITranscript, TranscriptSegment } from "@/types/transcript";
 import { TranscriptAdapter } from "./base";
 
 export interface WhisperWord {
@@ -33,13 +33,8 @@ export class WhisperAdapter extends TranscriptAdapter<WhisperRawResult> {
       start: seg.start,
       end: seg.end,
       text: seg.text.trim(),
-      words: this.mapWords(seg.words),
       confidence: Math.exp(seg.avg_logprob),
     }));
-
-    const words: TranscriptWord[] = raw.segments.flatMap((seg) =>
-      this.mapWords(seg.words)
-    );
 
     return {
       provider: this.provider,
@@ -47,17 +42,7 @@ export class WhisperAdapter extends TranscriptAdapter<WhisperRawResult> {
       text: raw.text.trim(),
       duration: raw.duration,
       segments,
-      words,
       createdAt: this.timestamp(),
     };
-  }
-
-  private mapWords(words: WhisperWord[]): TranscriptWord[] {
-    return words.map((w) => ({
-      word: w.word.trim(),
-      start: w.start,
-      end: w.end,
-      confidence: w.probability,
-    }));
   }
 }

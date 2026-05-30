@@ -1,4 +1,4 @@
-import type { ITranscript, TranscriptSegment, TranscriptWord } from "@/types/transcript";
+import type { ITranscript, TranscriptSegment } from "@/types/transcript";
 import { TranscriptAdapter } from "./base";
 
 interface Json3Seg {
@@ -31,15 +31,6 @@ export class YouTubeTranscriptAdapter extends TranscriptAdapter<YouTubeJson3> {
     const duration = last ? (last.tStartMs + (last.dDurationMs ?? 0)) / 1000 : 0;
 
     const segments: TranscriptSegment[] = captionEvents.map((event, index) => {
-      const segWords: TranscriptWord[] = event.segs
-        .filter((s) => s.utf8.replace(/\n/g, "").trim().length > 0)
-        .map((s) => ({
-          word: s.utf8.replace(/\n/g, " ").trim(),
-          start: (event.tStartMs + (s.tOffsetMs ?? 0)) / 1000,
-          end: (event.tStartMs + (s.tOffsetMs ?? 0) + (event.dDurationMs ?? 0)) / 1000,
-          confidence: 1,
-        }));
-
       const text = event.segs
         .map((s) => s.utf8)
         .join("")
@@ -51,7 +42,6 @@ export class YouTubeTranscriptAdapter extends TranscriptAdapter<YouTubeJson3> {
         start: event.tStartMs / 1000,
         end: (event.tStartMs + (event.dDurationMs ?? 0)) / 1000,
         text,
-        words: segWords,
         confidence: 1,
       };
     });
@@ -65,7 +55,6 @@ export class YouTubeTranscriptAdapter extends TranscriptAdapter<YouTubeJson3> {
         .join(" "),
       duration,
       segments,
-      words: segments.flatMap((s) => s.words),
       createdAt: this.timestamp(),
     };
   }

@@ -1,5 +1,2 @@
-const main = (): void => {
-  console.log("Server starting...");
-};
-
-main();
+import "dotenv/config";
+import "./server";

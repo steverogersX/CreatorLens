@@ -6,11 +6,6 @@ import type { IVideoMeta } from "@/types/video-meta";
 import type { ITranscript } from "@/types/transcript";
 import { fetchCaptionJson3 } from "@/utils/captions";
 
-export interface VideoAnalysis {
-  meta: IVideoMeta;
-  transcript: ITranscript;
-}
-
 const ytdlp = new YtDlp();
 const transcriptAdapter = new YouTubeTranscriptAdapter();
 const metaAdapter = new YtDlpVideoMetaAdapter();
@@ -33,7 +28,7 @@ export async function getYouTubeMetadata(url: string): Promise<IVideoMeta> {
   return metaAdapter.adapt(info);
 }
 
-export async function analyzeYouTubeVideo(url: string): Promise<VideoAnalysis> {
+export async function fetchYouTubeVideoData(url: string): Promise<{ meta: IVideoMeta; transcript: ITranscript }> {
   const [transcript, meta] = await Promise.all([
     getYouTubeTranscript(url),
     getYouTubeMetadata(url),
