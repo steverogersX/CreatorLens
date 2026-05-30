@@ -1,0 +1,15 @@
+{
+  "name": "projectk",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "prepare": "lefthook install"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "lefthook": "^2.1.9"
+  }
+}
