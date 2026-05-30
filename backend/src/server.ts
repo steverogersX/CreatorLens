@@ -2,6 +2,7 @@ import express, { type Application, type Request, type Response, type NextFuncti
 import helmet from "helmet";
 import cors from "cors";
 import morgan from "morgan";
+import { config } from "@/config";
 import { errorHandler } from "@/middlewares/error-handler";
 import { sendSuccess } from "@/types/api-response";
 import { NotFoundError } from "@/errors/app-error";
@@ -27,7 +28,7 @@ app.use((_req: Request, _res: Response, next: NextFunction) => {
 
 app.use(errorHandler);
 
-const PORT = process.env["PORT"] ?? 3000;
+const PORT = config.PORT;
 
 const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
