@@ -8,32 +8,28 @@ import rehypeKatex from "rehype-katex";
 import { Copy, ThumbsUp, ThumbsDown, RotateCcw, Pencil, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CitationBadge } from "@/components/citation-badge";
+import type { UIMessage, TextUIPart } from "ai";
+
+export type Message = UIMessage;
 
 type VideoPlatform = "youtube" | "instagram" | "twitter";
-
-export interface Citation {
-  video: "A" | "B";
-  timestamp?: string;
-  chunk?: number;
-}
-
-export interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  citations?: Citation[];
-  streaming?: boolean;
-  createdAt?: Date;
-}
 
 interface ChatMessageProps {
   message: Message;
   videoPlatforms: Record<"A" | "B", VideoPlatform>;
+  streaming?: boolean;
 }
 
-/* ── Inline citation parser ─────────────────────────────── */
+function getTextContent(message: Message): string {
+  return message.parts
+    .filter((p): p is TextUIPart => p.type === "text")
+    .map((p) => p.text)
+    .join("");
+}
+
 const CITE_RE = /\[([AB]):([^\]]+)\]/g;
 
+// Splits text on [A:timestamp] / [B:timestamp] markers and replaces with CitationBadge nodes
 function splitOnCitations(
   text: string,
   platforms: Record<"A" | "B", VideoPlatform>
@@ -73,7 +69,6 @@ function parseChildren(
   return children;
 }
 
-/* ── Markdown component factory ─────────────────────────── */
 function makeMdComponents(
   platforms: Record<"A" | "B", VideoPlatform>
 ): React.ComponentProps<typeof ReactMarkdown>["components"] {
@@ -134,7 +129,6 @@ function makeMdComponents(
   };
 }
 
-/* ── Tiny action button ──────────────────────────────────── */
 function ActionBtn({
   icon: Icon,
   label,
@@ -162,22 +156,21 @@ function ActionBtn({
   );
 }
 
-/* ── ChatMessage ─────────────────────────────────────────── */
-export function ChatMessage({ message, videoPlatforms }: ChatMessageProps) {
+export function ChatMessage({ message, videoPlatforms, streaming = false }: ChatMessageProps) {
   const isUser = message.role === "user";
+  const textContent = getTextContent(message);
   const [copied, setCopied] = useState(false);
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
 
   function handleCopy() {
-    navigator.clipboard.writeText(message.content);
+    navigator.clipboard.writeText(textContent);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   }
 
   const mdComponents = makeMdComponents(videoPlatforms);
 
-  /* ── User message ── */
   if (isUser) {
     return (
       <div className="group/msg flex flex-col items-end gap-1.5">
@@ -186,10 +179,9 @@ export function ChatMessage({ message, videoPlatforms }: ChatMessageProps) {
           "rounded-3xl rounded-tr-lg px-5 py-3",
           "text-[14px] leading-[1.75] text-foreground"
         )}>
-          {message.content}
+          {textContent}
         </div>
 
-        {/* User actions — fade in on hover */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity duration-150 pr-1">
           <ActionBtn icon={copied ? Check : Copy} label="Copy" active={copied} onClick={handleCopy} />
           <ActionBtn icon={Pencil} label="Edit" />
@@ -198,21 +190,18 @@ export function ChatMessage({ message, videoPlatforms }: ChatMessageProps) {
     );
   }
 
-  /* ── AI message — no bubble, flows on background ── */
   return (
     <div className="group/msg flex flex-col gap-2">
-      {/* Message body */}
-      <div className={cn(message.streaming && "cursor-blink")}>
+      <div className={cn(streaming && "cursor-blink")}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkMath]}
           rehypePlugins={[rehypeKatex]}
           components={mdComponents}
         >
-          {message.content}
+          {textContent}
         </ReactMarkdown>
       </div>
 
-      {/* AI actions — fade in on hover */}
       <div className="flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity duration-150 -ml-1">
         <ActionBtn icon={copied ? Check : Copy} label="Copy" active={copied} onClick={handleCopy} />
         <ActionBtn
