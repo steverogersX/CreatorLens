@@ -28,10 +28,12 @@ const socialMediaUrl = z
 
 export const newThreadSchema = z.object({
   urls: z.tuple([socialMediaUrl, socialMediaUrl]),
+  userMessage: z.string().min(1, "userMessage cannot be empty"),
 });
 
 export const followUpSchema = z.object({
   threadId: z.string().uuid("threadId must be a valid UUID"),
+  userMessage: z.string().min(1, "userMessage cannot be empty"),
 });
 
 export const analyzeVideosSchema = z.discriminatedUnion("type", [

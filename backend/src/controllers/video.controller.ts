@@ -5,6 +5,7 @@ import { BadRequestError } from "@/errors/app-error";
 import { analyzeVideos as analyzeVideoService } from "@/services/video.service";
 import { threadExists } from "@/db/persist";
 import { StatusCodes } from "http-status-codes";
+import { runAgent } from "@/agent";
 
 export async function analyzeVideos(req: Request, res: Response, next: NextFunction): Promise<void> {
   const result = analyzeVideosSchema.safeParse(req.body);
@@ -14,11 +15,16 @@ export async function analyzeVideos(req: Request, res: Response, next: NextFunct
 
   if (result.data.type === "followup") {
     const { threadId } = result.data;
+    const { userMessage } = result.data;
     const exists = await threadExists(threadId);
     if (!exists) {
       throw new BadRequestError(`Thread ${threadId} not found`);
     }
-    res.status(StatusCodes.OK).json({ data: { threadId } });
+
+    const aiResponse = await runAgent(threadId, userMessage);
+    console.log("Agent response:", aiResponse);
+
+    res.status(StatusCodes.OK).json({ data: { threadId, userMessage, aiResponse } });
     return;
   }
 
