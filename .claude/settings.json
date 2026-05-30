@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Remove-Item -Recurse -Force \"c:\\\\Users\\\\pavan\\\\projectK\\\\backend\\\\.git\")",
+      "Bash(npx tsc *)",
+      "Bash(npm uninstall *)",
+      "Bash(grep -qP \"^\\(feat|fix|refactor|chore|docs|test|style|perf|ci\\)\\(\\\\\\([a-z0-9-]+\\\\\\)\\)?: .{1,68}[^.]$\")",
+      "Bash(grep -qE \"^\\(feat|fix|refactor|chore|docs|test|style|perf|ci\\)\\(\\\\\\([a-z0-9-]+\\\\\\)\\)?: .{1,68}[^.]$\")",
+      "Bash(bash --version)",
+      "Bash(echo \"chore\\(hooks\\): fix lefthook shell and path handling for Windows\")",
+      "Bash(bash -c 'msg=$\\(head -1 .git/COMMIT_EDITMSG\\); echo \"MSG: $msg\"; pattern=\"^\\(feat|fix|refactor|chore|docs|test|style|perf|ci\\)\\([a-z0-9-]+\\)?: .{1,68}[^.]$\"; echo \"$msg\" | grep -qE \"$pattern\" && echo PASS || echo FAIL')",
+      "Bash(bash -c 'msg=\"chore\\(hooks\\): fix lefthook shell and path handling for Windows\"; pattern=\"^\\(feat|fix|refactor|chore|docs|test|style|perf|ci\\)\\(\\\\\\([a-z0-9-]+\\\\\\)\\)?: .{1,68}[^.]$\"; echo \"$msg\" | grep -qE \"$pattern\" && echo PASS || echo FAIL')",
+      "PowerShell(\\(Get-Command bash -ErrorAction SilentlyContinue\\).Source)",
+      "PowerShell(\\(Get-Command git\\).Source; $gitDir = Split-Path \\(Get-Command git\\).Source; ls \"$gitDir\\\\..\\\\..\\\\bin\\\\bash.exe\" 2>$null; ls \"C:\\\\Program Files\\\\Git\\\\bin\\\\bash.exe\" 2>$null)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\pavan\\projectK\\backend\\.git"
+    ]
+  }
+}
