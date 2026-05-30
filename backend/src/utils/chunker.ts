@@ -7,6 +7,7 @@ export interface TranscriptChunk {
   text: string;
   startTime: number;
   endTime: number;
+  embedding: number[];
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
@@ -32,7 +33,9 @@ function stdDev(values: number[]): number {
   return Math.sqrt(variance);
 }
 
-function buildChunk(index: number, segments: TranscriptSegment[]): TranscriptChunk {
+type RawChunk = Omit<TranscriptChunk, "embedding">;
+
+function buildChunk(index: number, segments: TranscriptSegment[]): RawChunk {
   return {
     chunkIndex: index,
     text: segments.map((s) => s.text).join(" ").trim(),
@@ -41,8 +44,8 @@ function buildChunk(index: number, segments: TranscriptSegment[]): TranscriptChu
   };
 }
 
-function mergeTinyChunks(chunks: TranscriptChunk[], minDuration: number): TranscriptChunk[] {
-  const result: TranscriptChunk[] = [];
+function mergeTinyChunks(chunks: RawChunk[], minDuration: number): RawChunk[] {
+  const result: RawChunk[] = [];
   for (const chunk of chunks) {
     const duration = chunk.endTime - chunk.startTime;
     if (duration < minDuration && result.length > 0) {
@@ -60,6 +63,11 @@ function mergeTinyChunks(chunks: TranscriptChunk[], minDuration: number): Transc
   return result;
 }
 
+async function embedChunks(chunks: RawChunk[], embedder: EmbeddingProvider): Promise<TranscriptChunk[]> {
+  const embeddings = await embedder.embed(chunks.map((c) => c.text), "passage");
+  return chunks.map((c, i) => ({ ...c, embedding: embeddings[i]! }));
+}
+
 export async function chunkTranscript(
   transcript: ITranscript,
   embedder: EmbeddingProvider,
@@ -67,7 +75,10 @@ export async function chunkTranscript(
   const segments = transcript.segments.filter((s) => s.text.trim().length > 0);
 
   if (segments.length === 0) return [];
-  if (segments.length === 1) return [buildChunk(0, segments)];
+
+  if (segments.length === 1) {
+    return embedChunks([buildChunk(0, segments)], embedder);
+  }
 
   const allEmbeddings = await embedder.embed(
     segments.map((s) => s.text),
@@ -76,23 +87,24 @@ export async function chunkTranscript(
 
   const similarities: number[] = [];
   for (let i = 0; i < allEmbeddings.length - 1; i++) {
-    similarities.push(cosineSimilarity(allEmbeddings[i], allEmbeddings[i + 1]));
+    similarities.push(cosineSimilarity(allEmbeddings[i]!, allEmbeddings[i + 1]!));
   }
 
   const threshold = median(similarities) - 1.5 * stdDev(similarities);
 
-  const rawChunks: TranscriptChunk[] = [];
-  let currentSegments: TranscriptSegment[] = [segments[0]];
+  const rawChunks: RawChunk[] = [];
+  let currentSegments: TranscriptSegment[] = [segments[0]!];
 
   for (let i = 1; i < segments.length; i++) {
-    if (similarities[i - 1] >= threshold) {
-      currentSegments.push(segments[i]);
+    if (similarities[i - 1]! >= threshold) {
+      currentSegments.push(segments[i]!);
     } else {
       rawChunks.push(buildChunk(rawChunks.length, currentSegments));
-      currentSegments = [segments[i]];
+      currentSegments = [segments[i]!];
     }
   }
   rawChunks.push(buildChunk(rawChunks.length, currentSegments));
 
-  return mergeTinyChunks(rawChunks, config.CHUNK_MIN_DURATION_SECS);
+  const merged = mergeTinyChunks(rawChunks, config.CHUNK_MIN_DURATION_SECS);
+  return embedChunks(merged, embedder);
 }

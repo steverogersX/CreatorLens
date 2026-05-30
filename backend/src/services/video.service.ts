@@ -1,9 +1,9 @@
-import { BadRequestError } from "@/errors/app-error";
 import type { IVideoMeta } from "@/types/video-meta";
 import type { ITranscript } from "@/types/transcript";
-import { chunkTranscript, type TranscriptChunk } from "@/services/chunker";
+import { chunkTranscript, type TranscriptChunk } from "@/utils/chunker";
+import { resolveService } from "@/utils/platform";
 import { getEmbedder } from "@/embeddings";
-import { fetchYouTubeVideoData } from "./youtube.service";
+import { persistThread } from "@/db/persist";
 
 export interface VideoAnalysis {
   meta: IVideoMeta;
@@ -11,28 +11,9 @@ export interface VideoAnalysis {
   chunks: TranscriptChunk[];
 }
 
-type VideoDataFetcher = (url: string) => Promise<{ meta: IVideoMeta; transcript: ITranscript }>;
-
-function resolveService(url: string): VideoDataFetcher {
-  const { hostname } = new URL(url);
-
-  if (hostname === "youtu.be" || hostname === "youtube.com" || hostname.endsWith(".youtube.com")) {
-    return fetchYouTubeVideoData;
-  }
-
-  if (hostname === "facebook.com" || hostname.endsWith(".facebook.com") || hostname === "fb.watch") {
-    throw new BadRequestError("Facebook support is not yet implemented");
-  }
-
-  if (hostname === "tiktok.com" || hostname.endsWith(".tiktok.com")) {
-    throw new BadRequestError("TikTok support is not yet implemented");
-  }
-
-  if (hostname === "instagram.com" || hostname.endsWith(".instagram.com")) {
-    throw new BadRequestError("Instagram support is not yet implemented");
-  }
-
-  throw new BadRequestError(`Unsupported platform: ${hostname}`);
+export interface ThreadResult {
+  threadId: string;
+  analyses: VideoAnalysis[];
 }
 
 async function analyzeVideo(url: string): Promise<VideoAnalysis> {
@@ -42,9 +23,8 @@ async function analyzeVideo(url: string): Promise<VideoAnalysis> {
   return { meta, transcript, chunks };
 }
 
-
-
-export async function analyzeVideos(urls: string[]): Promise<VideoAnalysis[]> {
+export async function analyzeVideos(urls: string[]): Promise<ThreadResult> {
   const analyses = await Promise.all(urls.map(analyzeVideo));
-  return analyses;
+  const threadId = await persistThread(analyses);
+  return { threadId, analyses };
 }
