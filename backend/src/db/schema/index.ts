@@ -82,7 +82,7 @@ export const chunks = pgTable(
     text: text("text").notNull(),
     startTime: real("start_time").notNull(),
     endTime: real("end_time").notNull(),
-    embedding: vector("embedding", { dimensions: 1024 }),
+    embedding: vector("embedding", { dimensions: 768 }),
   },
   (t) => [index("chunks_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops"))],
 );
