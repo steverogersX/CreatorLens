@@ -19,7 +19,6 @@ function extractVideoId(url: string, platform: Platform): string {
     const m = url.match(/instagram\.com\/(?:p|reel)\/([^/?#]+)/);
     return m?.[1] ?? "";
   }
-  // twitter/x: extract tweet id
   const m = url.match(/status\/(\d+)/);
   return m?.[1] ?? "";
 }
@@ -90,9 +89,13 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
   const VIDEO_A = urlA ? buildVideoData(urlA, "A", "blue") : DEMO_A;
   const VIDEO_B = urlB ? buildVideoData(urlB, "B", "green") : DEMO_B;
 
+  const chatUrls: [string, string] = [
+    urlA ?? `https://www.youtube.com/watch?v=${DEMO_A.videoId}`,
+    urlB ?? `https://www.youtube.com/watch?v=${DEMO_B.videoId}`,
+  ];
+
   return (
     <div className="flex flex-col h-full bg-background text-foreground">
-      {/* Minimal top bar */}
       <header className="flex items-center gap-3 px-4 h-[50px] border-b border-border/50 shrink-0 bg-background">
         <Link
           href="/"
@@ -114,23 +117,20 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
         </div>
       </header>
 
-      {/* 3-column layout */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Video A */}
         <aside className="w-[25%] min-w-[260px] max-w-[340px] flex flex-col overflow-y-auto border-r border-border/50 bg-card shrink-0">
           <VideoCard video={VIDEO_A} />
         </aside>
 
-        {/* Chat */}
         <main className="flex flex-col flex-1 overflow-hidden min-w-0">
           <ChatPanel
             platformA={VIDEO_A.platform}
             platformB={VIDEO_B.platform}
+            urls={chatUrls}
             initialQuestion={initialQuestion}
           />
         </main>
 
-        {/* Video B */}
         <aside className="w-[25%] min-w-[260px] max-w-[340px] flex flex-col overflow-y-auto border-l border-border/50 bg-card shrink-0">
           <VideoCard video={VIDEO_B} />
         </aside>
