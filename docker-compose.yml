@@ -1,0 +1,16 @@
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: creatorlens_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: creatorlens
+      POSTGRES_PASSWORD: creatorlens
+      POSTGRES_DB: creatorlens
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

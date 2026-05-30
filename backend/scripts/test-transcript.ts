@@ -43,7 +43,7 @@ async function run(): Promise<void> {
       const transcript = TranscriptSchema.parse(adapter.adapt(raw));
 
       console.log(
-        `Segments: ${transcript.segments.length}, Words: ${transcript.words.length}, Duration: ${toTimestamp(transcript.duration)}`,
+        `Segments: ${transcript.segments.length}, Duration: ${toTimestamp(transcript.duration)}`,
       );
       console.log("\nTranscript:");
       transcript.segments.forEach((seg) => {
