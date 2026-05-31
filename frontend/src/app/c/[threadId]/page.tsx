@@ -2,19 +2,19 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Aperture, ArrowLeft } from "lucide-react";
 import { VideoCard, type VideoData, type Platform } from "@/components/video-card";
-import { ChatPanel } from "@/components/chat-panel";
-import { LiveStreamView } from "@/components/live-stream-view";
+import { LiveVideoCard } from "@/components/live-video-card";
+import { ConversationPanel } from "@/components/conversation-panel";
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
 import type { UIMessage } from "ai";
-import type { ThreadVideoRow } from "@/types/thread";
+import type { ThreadVideoRow, ThreadStatus } from "@/types/thread";
 
 interface ThreadPageProps {
   params: Promise<{ threadId: string }>;
-  searchParams: Promise<{ fresh?: string; a?: string; b?: string }>;
+  searchParams: Promise<{ q?: string }>;
 }
 
 function detectPlatform(url: string): Platform {
@@ -24,25 +24,19 @@ function detectPlatform(url: string): Platform {
 }
 
 function extractVideoId(url: string, platform: Platform): string {
-  if (platform === "youtube") {
+  if (platform === "youtube")
     return url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1] ?? "";
-  }
-  if (platform === "instagram") {
+  if (platform === "instagram")
     return url.match(/instagram\.com\/(?:p|reel)\/([^/?#]+)/)?.[1] ?? "";
-  }
   return url.match(/status\/(\d+)/)?.[1] ?? "";
 }
 
-function buildSkeleton(
-  url: string,
-  label: "A" | "B",
-  accent: "blue" | "green",
-): VideoData {
+function buildSkeleton(url: string, label: "A" | "B", accent: "blue" | "green"): VideoData {
   const platform = detectPlatform(url);
   const videoType =
     platform === "youtube" && url.includes("/shorts/") ? "short" :
-    platform === "instagram" && url.includes("/reel/") ? "reel" :
-    platform === "instagram" ? "post" :
+    platform === "instagram" && url.includes("/reel/")  ? "reel"  :
+    platform === "instagram"                            ? "post"  :
     "video" as const;
   return {
     label,
@@ -63,13 +57,13 @@ function buildSkeleton(
 
 function videoRowToData(row: ThreadVideoRow, label: "A" | "B", accent: "blue" | "green"): VideoData {
   const platform: Platform =
-    row.provider === "youtube" ? "youtube" :
+    row.provider === "youtube"   ? "youtube"   :
     row.provider === "instagram" ? "instagram" : "twitter";
 
   const videoType =
-    platform === "youtube" && row.url.includes("/shorts/") ? "short" :
-    platform === "instagram" && row.url.includes("/reel/") ? "reel" :
-    platform === "instagram" ? "post" :
+    platform === "youtube"   && row.url.includes("/shorts/") ? "short" :
+    platform === "instagram" && row.url.includes("/reel/")   ? "reel"  :
+    platform === "instagram"                                  ? "post"  :
     "video" as const;
 
   return {
@@ -97,35 +91,31 @@ function dbMessagesToUIMessages(rows: Array<{ role: string; content: string }>):
   }));
 }
 
+function emptyVideo(label: "A" | "B", accent: "blue" | "green"): VideoData {
+  return {
+    label, accent, platform: "youtube", videoType: "video",
+    videoId: "", title: "", creator: "", followers: "",
+    views: "", likes: "", comments: "", duration: "", engagementRate: 0,
+  };
+}
+
 export default async function ThreadPage({ params, searchParams }: ThreadPageProps) {
   const { threadId } = await params;
-  const sp = await searchParams;
+  const { q } = await searchParams;
+  const initialQuestion = q ? decodeURIComponent(q) : undefined;
 
-  // Fresh stream — home page is feeding active-stream store, LiveStreamView subscribes
-  if (sp.fresh === "1" && sp.a && sp.b) {
-    const urlA = decodeURIComponent(sp.a);
-    const urlB = decodeURIComponent(sp.b);
-    const skeletonA = buildSkeleton(urlA, "A", "blue");
-    const skeletonB = buildSkeleton(urlB, "B", "green");
+  // Mock threads skip DB fetch entirely — active-stream store has all data
+  if (threadId.startsWith("mock-")) {
     return (
-      <div className="flex flex-col h-full bg-background text-foreground">
-        <header className="flex items-center gap-3 px-4 h-[50px] border-b border-border/50 shrink-0 bg-background">
-          <Link href="/" className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors duration-150 group">
-            <ArrowLeft size={13} strokeWidth={2} className="group-hover:-translate-x-0.5 transition-transform duration-150" />
-            New comparison
-          </Link>
-          <div className="w-px h-4 bg-border/60" />
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-foreground flex items-center justify-center shrink-0">
-              <Aperture size={12} className="text-background" strokeWidth={2} />
-            </div>
-            <span className="text-[13px] font-medium text-foreground/70 tracking-tight">CreatorLens</span>
-          </div>
-        </header>
-        <div className="flex flex-1 overflow-hidden">
-          <LiveStreamView threadId={threadId} skeletonA={skeletonA} skeletonB={skeletonB} />
-        </div>
-      </div>
+      <ThreadShell threadId={threadId}>
+        <LiveVideoCard threadId={threadId} position={1} initial={emptyVideo("A", "blue")} />
+        <ConversationPanel
+          threadId={threadId}
+          initialMessages={[]}
+          streamOnMount
+        />
+        <LiveVideoCard threadId={threadId} position={2} initial={emptyVideo("B", "green")} />
+      </ThreadShell>
     );
   }
 
@@ -137,22 +127,66 @@ export default async function ThreadPage({ params, searchParams }: ThreadPagePro
   const json = (await res.json()) as {
     data: {
       threadId: string;
+      status: ThreadStatus;
       videos: ThreadVideoRow[];
       messages: Array<{ role: string; content: string }>;
     };
   };
   const { data } = json;
 
-  const videoA = data.videos[0] ? videoRowToData(data.videos[0], "A", "blue") : null;
-  const videoB = data.videos[1] ? videoRowToData(data.videos[1], "B", "green") : null;
-  if (!videoA || !videoB) redirect("/");
+  const isLive = data.status !== "completed";
+
+  // Only hard-redirect when completed and data is genuinely missing
+  if (!isLive && (!data.videos[0] || !data.videos[1])) redirect("/");
+
+  const videoA = data.videos[0]?.title
+    ? videoRowToData(data.videos[0], "A", "blue")
+    : buildSkeleton(data.videos[0]?.url ?? "", "A", "blue");
+
+  const videoB = data.videos[1]?.title
+    ? videoRowToData(data.videos[1], "B", "green")
+    : buildSkeleton(data.videos[1]?.url ?? "", "B", "green");
 
   const initialMessages = dbMessagesToUIMessages(data.messages);
 
   return (
+    <ThreadShell threadId={threadId}>
+      {isLive
+        ? <LiveVideoCard threadId={threadId} position={1} initial={videoA} />
+        : <VideoCard video={videoA} />
+      }
+      <ConversationPanel
+        key={initialMessages.length}
+        threadId={data.threadId}
+        platformA={videoA.platform}
+        platformB={videoB.platform}
+        initialMessages={initialMessages}
+        initialQuestion={initialQuestion}
+        streamOnMount={isLive}
+      />
+      {isLive
+        ? <LiveVideoCard threadId={threadId} position={2} initial={videoB} />
+        : <VideoCard video={videoB} />
+      }
+    </ThreadShell>
+  );
+}
+
+function ThreadShell({
+  threadId: _threadId,
+  children,
+}: {
+  threadId: string;
+  children: [React.ReactNode, React.ReactNode, React.ReactNode];
+}) {
+  const [leftPanel, center, rightPanel] = children;
+  return (
     <div className="flex flex-col h-full bg-background text-foreground">
       <header className="flex items-center gap-3 px-4 h-[50px] border-b border-border/50 shrink-0 bg-background">
-        <Link href="/" className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors duration-150 group">
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors duration-150 group"
+        >
           <ArrowLeft size={13} strokeWidth={2} className="group-hover:-translate-x-0.5 transition-transform duration-150" />
           New comparison
         </Link>
@@ -164,26 +198,22 @@ export default async function ThreadPage({ params, searchParams }: ThreadPagePro
           <span className="text-[13px] font-medium text-foreground/70 tracking-tight">CreatorLens</span>
         </div>
       </header>
+
       <ResizablePanelGroup orientation="horizontal" className="flex-1 overflow-hidden">
         <ResizablePanel defaultSize="25" minSize="15" className="flex flex-col overflow-y-auto bg-card">
-          <VideoCard video={videoA} />
+          {leftPanel}
         </ResizablePanel>
 
         <ResizableHandle withHandle />
 
         <ResizablePanel defaultSize="50" minSize="25" className="flex flex-col overflow-hidden">
-          <ChatPanel
-            threadId={data.threadId}
-            platformA={videoA.platform}
-            platformB={videoB.platform}
-            initialMessages={initialMessages}
-          />
+          {center}
         </ResizablePanel>
 
         <ResizableHandle withHandle />
 
         <ResizablePanel defaultSize="25" minSize="15" className="flex flex-col overflow-y-auto bg-card">
-          <VideoCard video={videoB} />
+          {rightPanel}
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import {
   Loader2,
   ChevronDown,
@@ -21,7 +21,7 @@ export interface AgentStep {
   stepStatus: "running" | "done";
 }
 
-interface StepFeedProps {
+interface AgentStepsProps {
   steps: AgentStep[];
   hasText: boolean;
 }
@@ -37,7 +37,7 @@ function resolveIcon(label: string): LucideIcon {
   return Zap;
 }
 
-export function StepFeed({ steps, hasText }: StepFeedProps) {
+function AgentStepsInner({ steps, hasText }: AgentStepsProps) {
   const isDone = steps.length > 0 && steps.every((s) => s.stepStatus === "done");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -111,13 +111,11 @@ export function StepFeed({ steps, hasText }: StepFeedProps) {
                     transition={{ duration: 0.18, delay: index * 0.06 }}
                     className="relative pb-4 last:pb-0"
                   >
-                    {/* Connector line */}
                     {!isLastStep && (
                       <div className="absolute left-[11px] top-[26px] bottom-0 w-px bg-border/60" />
                     )}
 
                     <div className="flex items-start gap-3">
-                      {/* Icon bubble */}
                       <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
@@ -136,7 +134,6 @@ export function StepFeed({ steps, hasText }: StepFeedProps) {
                         )}
                       </motion.div>
 
-                      {/* Label */}
                       <span
                         className={cn(
                           "text-[12.5px] leading-5",
@@ -157,3 +154,5 @@ export function StepFeed({ steps, hasText }: StepFeedProps) {
     </div>
   );
 }
+
+export const AgentSteps = memo(AgentStepsInner);

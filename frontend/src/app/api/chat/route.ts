@@ -90,7 +90,7 @@ export async function POST(req: Request): Promise<Response> {
             case "agent_step":
               writer.write({
                 type: "data-agent-step",
-                data: { label: event["label"], stepStatus: event["stepStatus"] },
+                data: { label: event["label"], platform: event["platform"], stepStatus: event["stepStatus"] },
               });
               break;
 
@@ -112,6 +112,11 @@ export async function POST(req: Request): Promise<Response> {
               break;
 
             case "error":
+              if (textStarted) {
+                writer.write({ type: "text-end", id: textPartId });
+                textStarted = false;
+              }
+              await reader.cancel();
               throw new Error(event["message"] as string);
           }
         }

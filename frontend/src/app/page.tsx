@@ -257,7 +257,7 @@ export default function Home() {
       const urlB = videoUrls[1] ?? "https://www.youtube.com/watch?v=Tn6-PIqc4UM";
       setTimeout(() => {
         setIsSubmitting(false);
-        router.push(`/c/${tid}?fresh=1&a=${encodeURIComponent(urlA)}&b=${encodeURIComponent(urlB)}`);
+        router.push(`/c/${tid}`);
       }, 300);
       return;
     }
@@ -311,14 +311,21 @@ export default function Home() {
               initStream(threadId);
               navigated = true;
               setIsSubmitting(false);
-              router.push(
-                `/c/${threadId}?fresh=1&a=${encodeURIComponent(urlA)}&b=${encodeURIComponent(urlB)}`,
-              );
+              router.push(`/c/${threadId}`);
+            } else if (event["type"] === "error" && !navigated) {
+              navigated = true; // prevent fallback toast from firing too
+              setIsSubmitting(false);
+              showToast((event["message"] as string | undefined) ?? "Something went wrong — please try again");
             } else if (threadId) {
-              // push remaining events into the store — LiveStreamView subscribes to these
               pushStreamEvent(event as LiveEvent);
             }
           }
+        }
+
+        // Stream closed before any event was received
+        if (!navigated) {
+          setIsSubmitting(false);
+          showToast("Something went wrong — please try again");
         }
       } catch {
         if (!navigated) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, memo, useDeferredValue } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -8,14 +8,14 @@ import rehypeKatex from "rehype-katex";
 import { Copy, ThumbsUp, ThumbsDown, RotateCcw, Pencil, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CitationBadge } from "@/components/citation-badge";
-import { StepFeed, type AgentStep } from "@/components/step-feed";
+import { AgentSteps, type AgentStep } from "@/components/agent-steps";
 import type { UIMessage, TextUIPart } from "ai";
 
 export type Message = UIMessage;
 
 type VideoPlatform = "youtube" | "instagram" | "twitter";
 
-interface ChatMessageProps {
+export interface MessageItemProps {
   message: Message;
   videoPlatforms: Record<"A" | "B", VideoPlatform>;
   streaming?: boolean;
@@ -45,7 +45,6 @@ function getStepsFromMessage(message: Message): AgentStep[] {
 
 const CITE_RE = /\[([AB]):([^\]]+)\]/g;
 
-// Splits text on [A:timestamp] / [B:timestamp] markers and replaces with CitationBadge nodes
 function splitOnCitations(
   text: string,
   platforms: Record<"A" | "B", VideoPlatform>
@@ -110,12 +109,12 @@ function makeMdComponents(
       </a>
     ),
     ul: ({ children }) => (
-      <ul className="list-disc list-inside text-[14px] text-foreground/90 space-y-1.5 mb-3 pl-1">
+      <ul className="list-disc list-inside text-[14px] text-foreground/90 space-y-1.5 pl-1 mb-3 last:mb-0">
         {children}
       </ul>
     ),
     ol: ({ children }) => (
-      <ol className="list-decimal list-inside text-[14px] text-foreground/90 space-y-1.5 mb-3 pl-1">
+      <ol className="list-decimal list-inside text-[14px] text-foreground/90 space-y-1.5 pl-1 mb-3 last:mb-0">
         {children}
       </ol>
     ),
@@ -128,19 +127,19 @@ function makeMdComponents(
       );
     },
     pre: ({ children }) => (
-      <pre className="bg-secondary border border-border/50 rounded-xl p-4 overflow-x-auto text-[12px] font-mono text-foreground/90 mb-3">
+      <pre className="bg-secondary border border-border/50 rounded-xl p-4 overflow-x-auto text-[12px] font-mono text-foreground/90 mb-3 last:mb-0">
         {children}
       </pre>
     ),
     blockquote: ({ children }) => (
-      <blockquote className="border-l-2 border-border pl-4 text-foreground/60 italic text-[14px] mb-3">
+      <blockquote className="border-l-2 border-border pl-4 text-foreground/60 italic text-[14px] mb-3 last:mb-0">
         {children}
       </blockquote>
     ),
-    h1: ({ children }) => <h1 className="text-[15px] font-semibold text-foreground mb-2 mt-1">{children}</h1>,
-    h2: ({ children }) => <h2 className="text-[14px] font-semibold text-foreground mb-2 mt-1">{children}</h2>,
+    h1: ({ children }) => <h1 className="text-[15px] font-semibold text-foreground mt-5 mb-2 first:mt-0">{children}</h1>,
+    h2: ({ children }) => <h2 className="text-[14px] font-semibold text-foreground mt-4 mb-2 first:mt-0">{children}</h2>,
     h3: ({ children }) => (
-      <h3 className="text-[12px] font-semibold text-foreground/60 uppercase tracking-wider mb-2 mt-1">{children}</h3>
+      <h3 className="text-[12px] font-semibold text-foreground/60 uppercase tracking-wider mt-3 mb-1.5 first:mt-0">{children}</h3>
     ),
   };
 }
@@ -172,13 +171,16 @@ function ActionBtn({
   );
 }
 
-export function ChatMessage({ message, videoPlatforms, streaming = false }: ChatMessageProps) {
+function MessageItemInner({ message, videoPlatforms, streaming = false }: MessageItemProps) {
   const isUser = message.role === "user";
-  const textContent = getTextContent(message);
-  const steps = getStepsFromMessage(message);
+  const textContent = useMemo(() => getTextContent(message), [message]);
+  const deferredText = useDeferredValue(textContent);
+  const steps = useMemo(() => getStepsFromMessage(message), [message]);
   const [copied, setCopied] = useState(false);
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
+
+  const mdComponents = useMemo(() => makeMdComponents(videoPlatforms), [videoPlatforms]);
 
   function handleCopy() {
     navigator.clipboard.writeText(textContent);
@@ -186,9 +188,6 @@ export function ChatMessage({ message, videoPlatforms, streaming = false }: Chat
     setTimeout(() => setCopied(false), 1800);
   }
 
-  const mdComponents = makeMdComponents(videoPlatforms);
-
-  // Don't render assistant messages with no text and no steps
   if (!isUser && !textContent && steps.length === 0) return null;
 
   if (isUser) {
@@ -212,18 +211,18 @@ export function ChatMessage({ message, videoPlatforms, streaming = false }: Chat
 
   return (
     <div className="group/msg flex flex-col gap-2">
-      <StepFeed steps={steps} hasText={textContent.length > 0} />
+      <AgentSteps steps={steps} hasText={textContent.length > 0} />
 
       {textContent && (
-      <div className={cn("markdown", streaming && "cursor-blink")}>
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm, remarkMath]}
-          rehypePlugins={[rehypeKatex]}
-          components={mdComponents}
-        >
-          {textContent}
-        </ReactMarkdown>
-      </div>
+        <div className={cn("markdown", streaming && "cursor-blink")}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+            components={mdComponents}
+          >
+            {deferredText}
+          </ReactMarkdown>
+        </div>
       )}
 
       <div className="flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity duration-150 -ml-1">
@@ -245,3 +244,5 @@ export function ChatMessage({ message, videoPlatforms, streaming = false }: Chat
     </div>
   );
 }
+
+export const MessageItem = memo(MessageItemInner);
