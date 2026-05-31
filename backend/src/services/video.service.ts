@@ -4,6 +4,7 @@ import { chunkTranscript, type TranscriptChunk } from "@/utils/chunker";
 import { resolveService } from "@/utils/platform";
 import { getEmbedder } from "@/embeddings";
 import { createThread, persistThread, persistVideoAnalysis } from "@/db/persist";
+import type { RequestEventBus } from "@/lib/event-bus";
 
 export interface VideoAnalysis {
   meta: IVideoMeta;
@@ -29,31 +30,27 @@ export async function analyzeVideos(urls: string[]): Promise<ThreadResult> {
   return { threadId, analyses };
 }
 
-export interface StreamingCallbacks {
-  onThreadCreated: (threadId: string) => void;
-  onVideoMeta: (position: number, meta: IVideoMeta) => void;
-  onVideoReady: (position: number) => void;
-}
-
-/**
- * Creates a thread immediately, then fetches both videos in parallel.
- * Fires callbacks as soon as each video's metadata and transcript are ready,
- * so the UI can update progressively rather than waiting for both to finish.
- */
 export async function analyzeVideosStreaming(
   urls: string[],
-  callbacks: StreamingCallbacks,
+  bus: RequestEventBus,
 ): Promise<string> {
   const threadId = await createThread();
-  callbacks.onThreadCreated(threadId);
+  bus.publish({ type: "thread_created", threadId });
 
   await Promise.all(
     urls.map(async (url, i) => {
       const position = i + 1;
+      const { hostname } = new URL(url);
+
       const analysis = await analyzeVideo(url);
-      callbacks.onVideoMeta(position, analysis.meta);
+
+      bus.publish({ type: "video_meta", position, meta: analysis.meta });
+
+      bus.publish({ type: "agent_step", platform: hostname, label: `Analyzing video ${hostname}`, stepStatus: "running" });
       await persistVideoAnalysis(threadId, position, analysis);
-      callbacks.onVideoReady(position);
+      bus.publish({ type: "agent_step", platform: hostname, label: `Analyzing video ${hostname}`, stepStatus: "done" });
+
+      bus.publish({ type: "video_ready", position });
     }),
   );
 

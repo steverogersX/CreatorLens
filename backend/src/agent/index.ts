@@ -1,5 +1,5 @@
 import { graph, graphConfig } from "./graph";
-import type { AgentStepStatus } from "@/types/sse";
+import type { RequestEventBus } from "@/lib/event-bus";
 
 export async function runAgent(threadId: string, userMessage: string): Promise<string> {
   const result = await graph.invoke(
@@ -23,8 +23,7 @@ function toolLabel(name: string): string {
 export async function streamAgent(
   threadId: string,
   userMessage: string,
-  onDelta: (delta: string) => void,
-  onStep?: (label: string, stepStatus: AgentStepStatus) => void,
+  bus: RequestEventBus,
 ): Promise<string> {
   const events = graph.streamEvents(
     { threadId, userMessage },
@@ -34,15 +33,6 @@ export async function streamAgent(
   let fullContent = "";
 
   for await (const event of events) {
-    // Tool lifecycle events — surface as agent steps
-    if (event.event === "on_tool_start" && event.metadata?.langgraph_node === "tools") {
-      onStep?.(toolLabel(event.name as string), "running");
-      continue;
-    }
-    if (event.event === "on_tool_end" && event.metadata?.langgraph_node === "tools") {
-      onStep?.(toolLabel(event.name as string), "done");
-      continue;
-    }
 
     if (event.event !== "on_chat_model_stream") continue;
     if (event.metadata?.langgraph_node !== "orchestrator") continue;
@@ -56,7 +46,7 @@ export async function streamAgent(
 
     if (content && !hasToolCallChunks) {
       fullContent += content;
-      onDelta(content);
+      bus.publish({ type: "text_delta", delta: content });
     }
   }
 
