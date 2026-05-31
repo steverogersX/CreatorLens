@@ -12,6 +12,7 @@ import {
 
 export const threads = pgTable("threads", {
   id: uuid("id").defaultRandom().primaryKey(),
+  status: text("status").notNull().default("streaming"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -25,15 +25,22 @@ export interface ThreadVideoRow {
   duration: number;
 }
 
+export type ThreadStatus = "streaming" | "completed" | "error";
+
 export interface ThreadData {
   threadId: string;
+  status: ThreadStatus;
   videos: ThreadVideoRow[];
   messages: Array<{ role: string; content: string; createdAt: Date }>;
 }
 
 export async function createThread(): Promise<string> {
-  const [thread] = await db.insert(threads).values({}).returning({ id: threads.id });
+  const [thread] = await db.insert(threads).values({ status: "streaming" }).returning({ id: threads.id });
   return thread!.id;
+}
+
+export async function updateThreadStatus(threadId: string, status: ThreadStatus): Promise<void> {
+  await db.update(threads).set({ status }).where(eq(threads.id, threadId));
 }
 
 export async function persistVideoAnalysis(
@@ -110,7 +117,7 @@ export async function saveMessages(
 
 export async function getThreadData(threadId: string): Promise<ThreadData | null> {
   const threadRows = await db
-    .select({ id: threads.id })
+    .select({ id: threads.id, status: threads.status })
     .from(threads)
     .where(eq(threads.id, threadId))
     .limit(1);
@@ -144,7 +151,12 @@ export async function getThreadData(threadId: string): Promise<ThreadData | null
       .orderBy(asc(chatMessages.createdAt)),
   ]);
 
-  return { threadId, videos: videoRows, messages: messageRows };
+  return {
+    threadId,
+    status: threadRows[0]!.status as ThreadStatus,
+    videos: videoRows,
+    messages: messageRows,
+  };
 }
 
 export async function threadExists(threadId: string): Promise<boolean> {
