@@ -5,6 +5,8 @@ import { ChatMistralAI } from "@langchain/mistralai";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import { config } from "@/config";
 
+const SDK_TIMEOUT_MS = 120_000;
+
 const DEFAULTS: Record<string, string> = {
   gemini: "gemini-2.0-flash",
   openai: "gpt-4o",
@@ -37,6 +39,7 @@ function createBaseModel() {
         model,
         apiKey: requireKey("openai", config.OPENAI_API_KEY),
         maxRetries: 0,
+        timeout: SDK_TIMEOUT_MS,
       });
 
     case "anthropic":
@@ -52,6 +55,7 @@ function createBaseModel() {
         apiKey: requireKey("deepseek", config.DEEPSEEK_API_KEY),
         configuration: { baseURL: "https://api.deepseek.com/v1" },
         maxRetries: 0,
+        timeout: SDK_TIMEOUT_MS,
       });
 
     case "mistral":

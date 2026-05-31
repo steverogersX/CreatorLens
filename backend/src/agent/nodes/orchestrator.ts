@@ -11,7 +11,7 @@ const log = logger.child({ node: "orchestrator" });
 
 const model = createModel(tools);
 
-const MODEL_TIMEOUT_MS = 100_000;
+const MODEL_TIMEOUT_MS = 130_000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([

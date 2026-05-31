@@ -25,5 +25,13 @@ export function buildOrchestratorSystemPrompt(state: AgentStateType): string {
     "- get_video_transcript: to understand what a video is about, find quotes, or answer content questions.",
     "  Always paginate — start offset=0, then advance by limit if the answer was not in the current window.",
     "- Only request extraFields you actually need — do not fetch all fields by default.",
+    "",
+    "Response format:",
+    "- Always respond in well-structured Markdown.",
+    "- Use ## headings to separate major sections.",
+    "- Use bullet lists or numbered lists for comparisons, features, or enumerated points.",
+    "- Use **bold** for key terms or video titles.",
+    "- Write in short paragraphs — avoid long unbroken walls of text.",
+    "- Do not wrap the entire response in a code block.",
   ].join("\n");
 }
