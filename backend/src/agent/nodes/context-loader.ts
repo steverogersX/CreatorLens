@@ -16,7 +16,7 @@ const ROLE_MAP: Record<string, (content: string) => HumanMessage | AIMessage | S
 };
 
 export async function contextLoader(state: AgentStateType): Promise<Partial<AgentStateType>> {
-  const { threadId } = state;
+  const { threadId, userMessage } = state;
 
   log.info({ threadId }, "[contextLoader] starting — loading chat history and video index");
 
@@ -51,9 +51,10 @@ export async function contextLoader(state: AgentStateType): Promise<Partial<Agen
     "[contextLoader] loaded content",
   );
 
-  const messages = history
-    .reverse()
-    .map((row) => (ROLE_MAP[row.role] ?? ROLE_MAP.assistant)(row.content));
+  const messages = [
+    ...history.reverse().map((row) => (ROLE_MAP[row.role] ?? ROLE_MAP.assistant)(row.content)),
+    new HumanMessage(userMessage),
+  ];
 
   return { messages, videoIndex: index };
 }
