@@ -4,12 +4,21 @@ import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const chatRequestSchema = z.object({
-  urls: z.tuple([z.url(), z.url()]),
-  message: z.string().min(1),
+const BACKEND_URL = process.env["BACKEND_URL"] ?? "http://localhost:5000";
+
+const newThreadSchema = z.object({
+  type: z.literal("new"),
+  urls: z.tuple([z.string().url(), z.string().url()]),
+  userMessage: z.string().min(1),
 });
 
-export type ChatRequest = z.infer<typeof chatRequestSchema>;
+const followUpSchema = z.object({
+  type: z.literal("followup"),
+  threadId: z.string().uuid(),
+  userMessage: z.string().min(1),
+});
+
+const chatRequestSchema = z.discriminatedUnion("type", [newThreadSchema, followUpSchema]);
 
 export async function POST(req: Request): Promise<Response> {
   let body: unknown;
@@ -24,24 +33,93 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: parsed.error.issues }, { status: 422 });
   }
 
-  const { urls, message } = parsed.data;
-  void urls;
-  void message;
+  const backendRes = await fetch(`${BACKEND_URL}/api/v1/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(parsed.data),
+  });
 
-  const placeholder =
-    "I've analyzed both videos. Ask me anything about their content, structure, teaching style, or how they compare.[A:0:42][B:1:15]";
+  if (!backendRes.ok || !backendRes.body) {
+    return Response.json({ error: "Backend unavailable" }, { status: 502 });
+  }
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
-      const partId = "text-0";
-      const chunks = placeholder.match(/\S+\s*/g) ?? [];
+      const reader = backendRes.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let textPartId = "text-0";
+      let textStarted = false;
 
-      writer.write({ type: "text-start", id: partId });
-      for (const chunk of chunks) {
-        writer.write({ type: "text-delta", id: partId, delta: chunk });
-        await new Promise<void>((r) => setTimeout(r, 28));
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const raw = line.slice(6).trim();
+          if (!raw) continue;
+
+          let event: Record<string, unknown>;
+          try {
+            event = JSON.parse(raw) as Record<string, unknown>;
+          } catch {
+            continue;
+          }
+
+          switch (event["type"]) {
+            case "thread_created":
+              writer.write({ type: "data-thread-created", data: { threadId: event["threadId"] } });
+              break;
+
+            case "video_meta":
+              writer.write({
+                type: "data-video-meta",
+                data: { position: event["position"], meta: event["meta"] },
+              });
+              break;
+
+            case "video_ready":
+              writer.write({ type: "data-video-ready", data: { position: event["position"] } });
+              break;
+
+            case "agent_step":
+              writer.write({
+                type: "data-agent-step",
+                data: { label: event["label"], stepStatus: event["stepStatus"] },
+              });
+              break;
+
+            case "text_delta": {
+              const delta = event["delta"] as string;
+              if (!textStarted) {
+                writer.write({ type: "text-start", id: textPartId });
+                textStarted = true;
+              }
+              writer.write({ type: "text-delta", id: textPartId, delta });
+              break;
+            }
+
+            case "done":
+              if (textStarted) {
+                writer.write({ type: "text-end", id: textPartId });
+                textStarted = false;
+              }
+              break;
+
+            case "error":
+              throw new Error(event["message"] as string);
+          }
+        }
       }
-      writer.write({ type: "text-end", id: partId });
+
+      if (textStarted) {
+        writer.write({ type: "text-end", id: textPartId });
+      }
     },
   });
 
