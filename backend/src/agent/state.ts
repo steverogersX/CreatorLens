@@ -9,6 +9,10 @@ export interface VideoIndexEntry {
 export const AgentState = Annotation.Root({
   ...MessagesAnnotation.spec,
   threadId: Annotation<string>(),
+  userMessage: Annotation<string>({
+    value: (_, update) => update,
+    default: () => "",
+  }),
   videoIndex: Annotation<VideoIndexEntry[]>({
     value: (_, update) => update,
     default: () => [],
