@@ -1,17 +1,19 @@
 "use client";
 
-import { Users } from "lucide-react";
+import { Users, Play, Zap, ImageIcon, Film, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatsRow } from "@/components/stats-row";
 import { EngagementBar } from "@/components/engagement-bar";
 import { motion } from "framer-motion";
 
 export type Platform = "youtube" | "instagram" | "twitter";
+export type VideoType = "video" | "short" | "post" | "reel";
 
 export interface VideoData {
   label: "A" | "B";
   accent: "blue" | "green";
   platform: Platform;
+  videoType: VideoType;
   videoId: string;
   title: string;
   creator: string;
@@ -23,14 +25,35 @@ export interface VideoData {
   engagementRate: number;
 }
 
+const ASPECT_CLASS: Record<string, string> = {
+  "youtube:video":  "aspect-video",
+  "youtube:short":  "aspect-[9/16]",
+  "instagram:post": "aspect-square",
+  "instagram:reel": "aspect-[9/16]",
+  "twitter:video":  "aspect-video",
+};
+
+const VIDEO_TYPE_META: Record<VideoType, {
+  label: string;
+  Icon: React.FC<{ size?: number; strokeWidth?: number; className?: string }>;
+}> = {
+  video: { label: "Video", Icon: Film },
+  short: { label: "Short", Icon: Zap },
+  post:  { label: "Post",  Icon: ImageIcon },
+  reel:  { label: "Reel",  Icon: Play },
+};
+
 interface PlatformConfig {
   name: string;
-  colorClass: string;
-  bgDim: string;
-  borderClass: string;
-  stripClass: string;
-  /** Tailwind aspect-ratio class */
-  aspectClass: string;
+  /** Tailwind text color */
+  color: string;
+  /** Tailwind bg tint */
+  bgTint: string;
+  /** Tailwind border */
+  border: string;
+  /** Raw hex for inline gradient */
+  hex: string;
+  creatorBg: string;
   embedUrl: (id: string) => string;
   Icon: React.FC<{ className?: string }>;
 }
@@ -62,84 +85,107 @@ function TwitterXIcon({ className }: { className?: string }) {
 const PLATFORM_CONFIG: Record<Platform, PlatformConfig> = {
   youtube: {
     name: "YouTube",
-    colorClass: "text-[#FF4444]",
-    bgDim: "bg-[#FF0000]/10",
-    borderClass: "border-[#FF0000]/25",
-    stripClass: "from-[#FF0000] via-[#FF4444]/60 to-transparent",
-    aspectClass: "aspect-video",
+    color: "text-[#FF4040]",
+    bgTint: "bg-[#FF0000]/6",
+    border: "border-[#FF0000]/18",
+    creatorBg: "bg-[#FF0000]/6 border-[#FF0000]/15",
+    hex: "#FF0000",
     embedUrl: (id) => `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1`,
     Icon: YouTubeIcon,
   },
   instagram: {
     name: "Instagram",
-    colorClass: "text-[#E1306C]",
-    bgDim: "bg-[#E1306C]/10",
-    borderClass: "border-[#E1306C]/25",
-    stripClass: "from-[#833AB4] via-[#E1306C]/70 to-[#F77737]/30",
-    aspectClass: "aspect-square",
+    color: "text-[#E1306C]",
+    bgTint: "bg-[#E1306C]/6",
+    border: "border-[#E1306C]/18",
+    creatorBg: "bg-[#E1306C]/6 border-[#E1306C]/15",
+    hex: "#833AB4",
     embedUrl: (id) => `https://www.instagram.com/p/${id}/embed`,
     Icon: InstagramIcon,
   },
   twitter: {
-    name: "Twitter / X",
-    colorClass: "text-[#1DA1F2]",
-    bgDim: "bg-[#1DA1F2]/10",
-    borderClass: "border-[#1DA1F2]/25",
-    stripClass: "from-[#1DA1F2] via-[#1DA1F2]/50 to-transparent",
-    aspectClass: "aspect-video",
+    name: "X (Twitter)",
+    color: "text-[#1D9BF0]",
+    bgTint: "bg-[#1D9BF0]/6",
+    border: "border-[#1D9BF0]/18",
+    creatorBg: "bg-[#1D9BF0]/6 border-[#1D9BF0]/15",
+    hex: "#1D9BF0",
     embedUrl: (id) => `https://platform.twitter.com/embed/Tweet.html?id=${id}`,
     Icon: TwitterXIcon,
   },
 };
 
+const LABEL_STYLE = {
+  blue:  "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  green: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+} as const;
+
+const LABEL_DOT = {
+  blue:  "bg-blue-400",
+  green: "bg-emerald-400",
+} as const;
+
 interface VideoCardProps {
   video: VideoData;
   index?: number;
+  isLoading?: boolean;
 }
 
-export function VideoCard({ video, index = 0 }: VideoCardProps) {
-  const { label, accent, platform, videoId, title, creator, followers } = video;
+function Skeleton({ className }: { className?: string }) {
+  return <div className={cn("rounded-lg bg-muted/40 animate-pulse", className)} />;
+}
+
+export function VideoCard({ video, index = 0, isLoading = false }: VideoCardProps) {
+  const { label, accent, platform, videoType, videoId, title, creator, followers } = video;
   const cfg = PLATFORM_CONFIG[platform];
-  const { Icon } = cfg;
+  const typeMeta = VIDEO_TYPE_META[videoType] ?? VIDEO_TYPE_META["video"];
+  const { Icon: PlatformIcon } = cfg;
+  const { Icon: TypeIcon } = typeMeta;
+  const aspectClass = ASPECT_CLASS[`${platform}:${videoType}`] ?? "aspect-video";
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.08, ease: "easeOut" }}
+      transition={{ duration: 0.3, delay: index * 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
       className="flex flex-col"
     >
-      {/* Platform accent strip */}
-      <div className={cn("h-0.5 w-full bg-gradient-to-r", cfg.stripClass)} />
+      {/* Platform accent bar */}
+      <div
+        className="h-[3px] w-full shrink-0"
+        style={{
+          background: `linear-gradient(90deg, ${cfg.hex} 0%, ${cfg.hex}55 55%, transparent 100%)`,
+        }}
+      />
 
-      <div className="flex flex-col p-5 gap-4">
+      <div className="flex flex-col gap-3.5 p-4">
 
-        {/* Platform badge + Video label */}
-        <div className="flex items-center justify-between">
-          <span className={cn(
-            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md",
-            "text-[10px] font-semibold font-mono tracking-wide border",
-            cfg.bgDim, cfg.colorClass, cfg.borderClass
+        {/* Platform badge + A/B label */}
+        <div className="flex items-center justify-between gap-2">
+          <div className={cn(
+            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg",
+            "text-[11px] font-semibold border shrink-0",
+            cfg.bgTint, cfg.color, cfg.border,
           )}>
-            <Icon className="w-3 h-3" />
-            {cfg.name}
-          </span>
+            <PlatformIcon className="w-3.5 h-3.5 shrink-0" />
+            <span className="leading-none">{cfg.name}</span>
+          </div>
 
-          <span className={cn(
-            "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold font-mono border",
-            accent === "blue"
-              ? "bg-accent-blue/10 text-accent-blue border-accent-blue/20"
-              : "bg-accent-green/10 text-accent-green border-accent-green/20"
+          <div className={cn(
+            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg",
+            "text-[11px] font-bold border uppercase tracking-widest shrink-0",
+            LABEL_STYLE[accent],
           )}>
+            <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", LABEL_DOT[accent])} />
             Video {label}
-          </span>
+          </div>
         </div>
 
-        {/* Video embed — aspect ratio driven by platform */}
+        {/* Embed */}
         <div className={cn(
-          "relative w-full rounded-lg overflow-hidden border bg-muted",
-          cfg.aspectClass,
-          cfg.borderClass
+          "relative w-full rounded-xl overflow-hidden border bg-zinc-950",
+          aspectClass,
+          cfg.border,
         )}>
           <iframe
             src={cfg.embedUrl(videoId)}
@@ -150,33 +196,80 @@ export function VideoCard({ video, index = 0 }: VideoCardProps) {
           />
         </div>
 
-        {/* Title */}
-        <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">
-          {title}
-        </p>
+        {/* Type chip + title */}
+        <div className="flex flex-col gap-1">
+          <div className="inline-flex items-center gap-1">
+            <TypeIcon size={10} strokeWidth={2.5} className="text-muted-foreground/50" />
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+              {typeMeta.label}
+            </span>
+          </div>
 
-        {/* Creator + followers */}
-        <div className="flex items-center justify-between">
-          <span className={cn("text-xs font-semibold font-mono", cfg.colorClass)}>
-            {creator}
-          </span>
-          <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-            <Users size={10} strokeWidth={2} />
-            {followers}
-          </span>
+          {isLoading ? (
+            <div className="flex flex-col gap-1.5 mt-0.5">
+              <Skeleton className="h-[15px] w-full" />
+              <Skeleton className="h-[15px] w-3/4" />
+            </div>
+          ) : (
+            <p className="text-[13.5px] font-semibold leading-[1.4] line-clamp-2 text-foreground tracking-tight">
+              {title || <span className="text-muted-foreground/40 italic font-normal">Loading…</span>}
+            </p>
+          )}
         </div>
 
-        {/* Stats — labels change per platform */}
-        <StatsRow
-          views={video.views}
-          likes={video.likes}
-          comments={video.comments}
-          duration={video.duration}
-          platform={platform}
-        />
+        {/* Creator row */}
+        <div className={cn(
+          "flex items-center justify-between gap-2 px-3 py-2 rounded-xl border",
+          cfg.creatorBg,
+        )}>
+          {isLoading ? (
+            <Skeleton className="h-3.5 w-28" />
+          ) : (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <CheckCircle2 size={12} strokeWidth={2} className={cn("shrink-0", cfg.color)} />
+              <span className={cn(
+                "text-[12px] font-semibold leading-none truncate",
+                cfg.color,
+              )}>
+                {creator || "—"}
+              </span>
+            </div>
+          )}
+
+          {isLoading ? (
+            <Skeleton className="h-3 w-14 shrink-0" />
+          ) : (
+            <div className="flex items-center gap-1 text-muted-foreground/60 shrink-0">
+              <Users size={11} strokeWidth={2} />
+              <span className="text-[11px] font-mono font-medium">{followers || "—"}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Stats */}
+        {isLoading ? (
+          <div className="grid grid-cols-2 gap-2">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-[52px]" />
+            ))}
+          </div>
+        ) : (
+          <StatsRow
+            views={video.views}
+            likes={video.likes}
+            comments={video.comments}
+            duration={video.duration}
+            platform={platform}
+          />
+        )}
 
         {/* Engagement */}
-        <EngagementBar rate={video.engagementRate} accent={accent} />
+        {isLoading ? (
+          <Skeleton className="h-[52px] rounded-xl" />
+        ) : (
+          <EngagementBar rate={video.engagementRate} accent={accent} />
+        )}
+
       </div>
     </motion.div>
   );

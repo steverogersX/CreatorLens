@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Aperture, ArrowUp, X } from "lucide-react";
+import { Aperture, ArrowUp, X, Loader2 } from "lucide-react";
+import { initStream, pushStreamEvent, type LiveEvent } from "@/lib/active-stream";
+import { playMockStream, MOCK_THREAD_ID } from "@/lib/mock-stream";
 import { cn } from "@/lib/utils";
 
 /* ── URL detection ─────────────────────────────────────────── */
@@ -165,9 +167,19 @@ export default function Home() {
   const [videoUrls, setVideoUrls] = useState<string[]>([]);
   const [question, setQuestion] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMock, setIsMock] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const canSubmit = videoUrls.length === 2;
+  // Resolve mock flag client-side only to avoid SSR hydration mismatch
+  useEffect(() => {
+    setIsMock(
+      process.env["NEXT_PUBLIC_MOCK_STREAM"] === "1" ||
+        new URLSearchParams(window.location.search).has("mock"),
+    );
+  }, []);
+
+  const canSubmit = (videoUrls.length === 2 || isMock) && !isSubmitting;
 
   // auto-grow
   useEffect(() => {
@@ -236,11 +248,85 @@ export default function Home() {
 
   function handleSubmit() {
     if (!canSubmit) return;
+
+    // ── Mock mode ─────────────────────────────────────────────────────────────
+    if (isMock) {
+      setIsSubmitting(true);
+      const tid = playMockStream(MOCK_THREAD_ID);
+      const urlA = videoUrls[0] ?? "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+      const urlB = videoUrls[1] ?? "https://www.youtube.com/watch?v=Tn6-PIqc4UM";
+      setTimeout(() => {
+        setIsSubmitting(false);
+        router.push(`/c/${tid}?fresh=1&a=${encodeURIComponent(urlA)}&b=${encodeURIComponent(urlB)}`);
+      }, 300);
+      return;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const [urlA, urlB] = videoUrls;
-    const href =
-      `/compare?a=${encodeURIComponent(urlA)}&b=${encodeURIComponent(urlB)}` +
-      (question.trim() ? `&q=${encodeURIComponent(question.trim())}` : "");
-    router.push(href);
+    const userMessage = question.trim() || "Compare these two videos";
+    setIsSubmitting(true);
+
+    void (async () => {
+      let navigated = false;
+      let threadId: string | null = null;
+      try {
+        const res = await fetch("/api/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "new", urls: [urlA, urlB], userMessage }),
+        });
+
+        if (!res.ok || !res.body) {
+          setIsSubmitting(false);
+          showToast("Failed to start — please try again");
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const raw = line.slice(6).trim();
+            if (!raw) continue;
+            let event: Record<string, unknown>;
+            try {
+              event = JSON.parse(raw) as Record<string, unknown>;
+            } catch {
+              continue;
+            }
+
+            if (event["type"] === "thread_created" && !navigated) {
+              threadId = event["threadId"] as string;
+              initStream(threadId);
+              navigated = true;
+              setIsSubmitting(false);
+              router.push(
+                `/c/${threadId}?fresh=1&a=${encodeURIComponent(urlA)}&b=${encodeURIComponent(urlB)}`,
+              );
+            } else if (threadId) {
+              // push remaining events into the store — LiveStreamView subscribes to these
+              pushStreamEvent(event as LiveEvent);
+            }
+          }
+        }
+      } catch {
+        if (!navigated) {
+          setIsSubmitting(false);
+          showToast("Something went wrong — please try again");
+        }
+      }
+    })();
   }
 
   function handleKey(e: React.KeyboardEvent) {
@@ -269,6 +355,11 @@ export default function Home() {
         </span>
       </div>
 
+      {isMock && (
+        <div className="mb-4 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-[11px] font-mono text-amber-400/80 tracking-widest">
+          MOCK MODE
+        </div>
+      )}
       <h1 className="text-[26px] font-semibold tracking-tight text-foreground text-center mb-1">
         Compare any two videos with AI
       </h1>
@@ -331,7 +422,11 @@ export default function Home() {
                   : "bg-border/40 text-muted-foreground/25 cursor-not-allowed"
               )}
             >
-              <ArrowUp size={14} strokeWidth={2.5} />
+              {isSubmitting ? (
+                <Loader2 size={13} strokeWidth={2} className="animate-spin" />
+              ) : (
+                <ArrowUp size={14} strokeWidth={2.5} />
+              )}
             </button>
           </div>
         </div>

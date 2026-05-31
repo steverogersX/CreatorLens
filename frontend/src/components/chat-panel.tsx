@@ -4,18 +4,38 @@ import { useState, useRef, useEffect } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { UIMessage } from "ai";
-import { ArrowUp, Sparkles } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChatMessage } from "@/components/chat-message";
 import { SuggestedQuestions } from "@/components/suggested-questions";
 
 type VideoPlatform = "youtube" | "instagram" | "twitter";
 
+interface IVideoMeta {
+  provider: string;
+  videoId: string;
+  title: string;
+  url: string;
+  views: number;
+  likes: number;
+  commentCount: number;
+  creator: { name: string; handle: string; followerCount: number };
+  duration: number;
+}
+
 interface ChatPanelProps {
   platformA?: VideoPlatform;
   platformB?: VideoPlatform;
-  urls: [string, string];
+  // New thread mode
+  urls?: [string, string];
   initialQuestion?: string;
+  onThreadCreated?: (threadId: string) => void;
+  onVideoMeta?: (position: number, meta: IVideoMeta) => void;
+  /** Fires once after the first full stream completes, with the new threadId */
+  onStreamDone?: (threadId: string) => void;
+  // Restore mode (threadId already known)
+  threadId?: string;
+  initialMessages?: UIMessage[];
 }
 
 const SUGGESTED = [
@@ -26,46 +46,103 @@ const SUGGESTED = [
   "Summarize key differences",
 ];
 
-const INITIAL_MESSAGES: UIMessage[] = [
-  {
-    id: "init-1",
-    role: "assistant",
-    parts: [
-      {
-        type: "text",
-        text: "I've analyzed both videos. Ask me anything about their content, structure, teaching style, or how they compare.",
-      },
-    ],
-  },
-];
-
 export function ChatPanel({
   platformA = "youtube",
   platformB = "youtube",
   urls,
   initialQuestion,
+  onThreadCreated,
+  onVideoMeta,
+  onStreamDone,
+  threadId: initialThreadId,
+  initialMessages,
 }: ChatPanelProps) {
   const videoPlatforms: Record<"A" | "B", VideoPlatform> = {
     A: platformA,
     B: platformB,
   };
 
+  // Track threadId without triggering re-renders
+  const threadIdRef = useRef<string | null>(initialThreadId ?? null);
+  const hasSentInitialRef = useRef(false);
+  // Deduplicate data-part callbacks — key = `${messageId}:${partType}:${extra}`
+  const processedPartsRef = useRef(new Set<string>());
+  const prevStatusRef = useRef<string>("ready");
+
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
       prepareSendMessagesRequest: ({ messages: msgs }) => {
         const lastUserMsg = msgs.findLast((m) => m.role === "user");
-        const text = lastUserMsg?.parts
-          .filter((p) => p.type === "text")
-          .map((p) => (p as { type: "text"; text: string }).text)
-          .join("") ?? "";
-        return { body: { urls, message: text } };
+        const userMessage =
+          lastUserMsg?.parts
+            .filter((p) => p.type === "text")
+            .map((p) => (p as { type: "text"; text: string }).text)
+            .join("") ?? "";
+
+        if (threadIdRef.current) {
+          return {
+            body: {
+              type: "followup",
+              threadId: threadIdRef.current,
+              userMessage,
+            },
+          };
+        }
+        return { body: { type: "new", urls, userMessage } };
       },
     }),
-    messages: INITIAL_MESSAGES,
-    id: urls.join("||"),
+    messages: initialMessages ?? [],
+    id: initialThreadId ?? (urls ? urls.join("||") : "chat"),
     onError: (err) => console.error("[chat]", err),
   });
+
+  // Parse data parts from the latest assistant message — deduplicated via processedPartsRef
+  useEffect(() => {
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((m) => m.role === "assistant");
+    if (!lastAssistant) return;
+
+    for (const part of lastAssistant.parts) {
+      if (part.type === "data-thread-created") {
+        const key = `${lastAssistant.id}:thread_created`;
+        if (!processedPartsRef.current.has(key) && !threadIdRef.current) {
+          processedPartsRef.current.add(key);
+          const { threadId } = (
+            part as unknown as { type: string; data: { threadId: string } }
+          ).data;
+          threadIdRef.current = threadId;
+          onThreadCreated?.(threadId);
+        }
+      }
+      if (part.type === "data-video-meta") {
+        const { position, meta } = (
+          part as unknown as {
+            type: string;
+            data: { position: number; meta: IVideoMeta };
+          }
+        ).data;
+        const key = `${lastAssistant.id}:video_meta:${position}`;
+        if (!processedPartsRef.current.has(key)) {
+          processedPartsRef.current.add(key);
+          onVideoMeta?.(position, meta);
+        }
+      }
+    }
+  }, [messages, onThreadCreated, onVideoMeta]);
+
+  // Fire onStreamDone once when the stream transitions from loading → ready (new thread only)
+  useEffect(() => {
+    const wasLoading =
+      prevStatusRef.current === "submitted" ||
+      prevStatusRef.current === "streaming";
+    const isNowReady = status === "ready";
+    if (wasLoading && isNowReady && threadIdRef.current && !initialThreadId) {
+      onStreamDone?.(threadIdRef.current);
+    }
+    prevStatusRef.current = status;
+  }, [status, initialThreadId, onStreamDone]);
 
   const [input, setInput] = useState(initialQuestion ?? "");
   const isLoading = status === "submitted" || status === "streaming";
@@ -79,6 +156,17 @@ export function ChatPanel({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Auto-send initialQuestion once on mount (new thread flow only)
+  useEffect(() => {
+    if (initialQuestion && !hasSentInitialRef.current && !initialThreadId) {
+      hasSentInitialRef.current = true;
+      sendMessage({ text: initialQuestion });
+      setInput("");
+    }
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleSend() {
     if (!input.trim() || isLoading) return;
@@ -95,22 +183,6 @@ export function ChatPanel({
 
   return (
     <div className="flex flex-col h-full bg-app-bg">
-      <div className="flex items-center justify-between px-6 py-3 border-b border-border/50 shrink-0">
-        <div className="flex items-center gap-2">
-          <Sparkles size={13} className="text-muted-foreground/60" strokeWidth={2} />
-          <span className="text-[13px] font-medium text-foreground/70 tracking-tight">
-            CreatorLens AI
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50 font-mono">
-          <span className={cn(
-            "w-1.5 h-1.5 rounded-full transition-colors duration-300",
-            isLoading ? "bg-accent-blue/70" : "bg-accent-green/70"
-          )} />
-          {isLoading ? "thinking…" : `${messages.filter((m) => m.role === "user").length} turns`}
-        </div>
-      </div>
-
       <div className="flex-1 overflow-y-auto custom-scrollbar py-8">
         <div className="max-w-2xl mx-auto px-6 flex flex-col gap-7">
           {messages.map((msg) => (
@@ -136,10 +208,12 @@ export function ChatPanel({
             questions={SUGGESTED}
             onSelect={(q) => setInput(q)}
           />
-          <div className={cn(
-            "flex items-end gap-3 bg-secondary rounded-3xl px-5 py-3.5",
-            "border border-border/50 focus-within:border-border transition-colors duration-150"
-          )}>
+          <div
+            className={cn(
+              "flex items-end gap-3 bg-secondary rounded-3xl px-5 py-3.5",
+              "border border-border/50 focus-within:border-border transition-colors duration-150",
+            )}
+          >
             <textarea
               rows={1}
               value={input}
@@ -151,7 +225,7 @@ export function ChatPanel({
                 "flex-1 resize-none bg-transparent",
                 "text-[14px] text-foreground placeholder:text-muted-foreground/35",
                 "outline-none font-sans leading-relaxed max-h-[140px] overflow-y-auto py-0.5",
-                "disabled:opacity-50"
+                "disabled:opacity-50",
               )}
             />
             <button
@@ -161,7 +235,7 @@ export function ChatPanel({
                 "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mb-0.5 transition-all duration-200",
                 isLoading || !input.trim()
                   ? "bg-border/40 text-muted-foreground/25 cursor-not-allowed"
-                  : "bg-foreground text-background hover:bg-foreground/90 hover:scale-105 active:scale-95"
+                  : "bg-foreground text-background hover:bg-foreground/90 hover:scale-105 active:scale-95",
               )}
             >
               {isLoading ? (

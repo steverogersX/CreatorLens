@@ -1,5 +1,9 @@
-import { Eye, ThumbsUp, MessageSquare, Clock, Heart, Bookmark, BarChart2, RefreshCcw } from "lucide-react";
+import {
+  Eye, ThumbsUp, MessageSquare, Clock,
+  Heart, Bookmark, BarChart2, Repeat2,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface StatsRowProps {
   views: string;
@@ -15,26 +19,27 @@ interface StatDef {
   key: StatKey;
   Icon: LucideIcon;
   label: string;
+  iconClass: string;
 }
 
 const PLATFORM_STATS: Record<"youtube" | "instagram" | "twitter", StatDef[]> = {
   youtube: [
-    { key: "views",    Icon: Eye,           label: "Views"    },
-    { key: "likes",    Icon: ThumbsUp,      label: "Likes"    },
-    { key: "comments", Icon: MessageSquare, label: "Comments" },
-    { key: "duration", Icon: Clock,         label: "Duration" },
+    { key: "views",    Icon: Eye,           label: "Views",    iconClass: "text-[#FF4040]"          },
+    { key: "likes",    Icon: ThumbsUp,      label: "Likes",    iconClass: "text-[#FF4040]"          },
+    { key: "comments", Icon: MessageSquare, label: "Comments", iconClass: "text-muted-foreground/50" },
+    { key: "duration", Icon: Clock,         label: "Duration", iconClass: "text-muted-foreground/50" },
   ],
   instagram: [
-    { key: "likes",    Icon: Heart,         label: "Likes"    },
-    { key: "views",    Icon: Eye,           label: "Views"    },
-    { key: "comments", Icon: MessageSquare, label: "Comments" },
-    { key: "duration", Icon: Bookmark,      label: "Saved"    },
+    { key: "likes",    Icon: Heart,         label: "Likes",    iconClass: "text-[#E1306C]"          },
+    { key: "views",    Icon: Eye,           label: "Views",    iconClass: "text-[#C13584]"          },
+    { key: "comments", Icon: MessageSquare, label: "Comments", iconClass: "text-muted-foreground/50" },
+    { key: "duration", Icon: Bookmark,      label: "Saves",    iconClass: "text-muted-foreground/50" },
   ],
   twitter: [
-    { key: "views",    Icon: BarChart2,     label: "Impressions" },
-    { key: "likes",    Icon: Heart,         label: "Likes"       },
-    { key: "comments", Icon: MessageSquare, label: "Replies"     },
-    { key: "duration", Icon: RefreshCcw,    label: "Retweets"    },
+    { key: "views",    Icon: BarChart2,     label: "Impressions", iconClass: "text-[#1D9BF0]"          },
+    { key: "likes",    Icon: Heart,         label: "Likes",       iconClass: "text-[#F91880]"          },
+    { key: "comments", Icon: MessageSquare, label: "Replies",     iconClass: "text-muted-foreground/50" },
+    { key: "duration", Icon: Repeat2,       label: "Retweets",    iconClass: "text-[#00BA7C]"          },
   ],
 };
 
@@ -43,21 +48,26 @@ export function StatsRow({ views, likes, comments, duration, platform = "youtube
   const stats = PLATFORM_STATS[platform];
 
   return (
-    <div className="grid grid-cols-4 gap-1.5">
-      {stats.map(({ key, Icon, label }) => (
+    <div className="grid grid-cols-2 gap-2">
+      {stats.map(({ key, Icon, label, iconClass }) => (
         <div
           key={`${platform}-${key}`}
-          className="bg-secondary rounded-lg px-2 py-2 flex flex-col gap-1"
+          className={cn(
+            "flex items-center gap-2.5 rounded-xl px-3 py-2.5",
+            "bg-muted/30 border border-border/40",
+          )}
         >
-          <div className="flex items-center gap-1">
-            <Icon size={9} className="text-muted-foreground" strokeWidth={2} />
-            <span className="text-[9px] text-muted-foreground uppercase tracking-[0.07em] font-semibold">
+          <div className="shrink-0">
+            <Icon size={15} strokeWidth={1.8} className={iconClass} />
+          </div>
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-[10px] font-medium text-muted-foreground/60 leading-none truncate">
               {label}
             </span>
+            <span className="text-[13px] font-bold text-foreground font-mono leading-none tracking-tight tabular-nums">
+              {values[key] || "—"}
+            </span>
           </div>
-          <span className="text-[11px] font-bold text-foreground font-mono tracking-tight">
-            {values[key]}
-          </span>
         </div>
       ))}
     </div>

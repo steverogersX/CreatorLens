@@ -8,6 +8,7 @@ import rehypeKatex from "rehype-katex";
 import { Copy, ThumbsUp, ThumbsDown, RotateCcw, Pencil, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CitationBadge } from "@/components/citation-badge";
+import { StepFeed, type AgentStep } from "@/components/step-feed";
 import type { UIMessage, TextUIPart } from "ai";
 
 export type Message = UIMessage;
@@ -25,6 +26,21 @@ function getTextContent(message: Message): string {
     .filter((p): p is TextUIPart => p.type === "text")
     .map((p) => p.text)
     .join("");
+}
+
+function getStepsFromMessage(message: Message): AgentStep[] {
+  const map = new Map<string, "running" | "done">();
+  const order: string[] = [];
+  for (const part of message.parts) {
+    if (part.type === "data-agent-step") {
+      const { label, stepStatus } = (
+        part as unknown as { type: string; data: AgentStep }
+      ).data;
+      if (!map.has(label)) order.push(label);
+      map.set(label, stepStatus);
+    }
+  }
+  return order.map((label) => ({ label, stepStatus: map.get(label)! }));
 }
 
 const CITE_RE = /\[([AB]):([^\]]+)\]/g;
@@ -159,6 +175,7 @@ function ActionBtn({
 export function ChatMessage({ message, videoPlatforms, streaming = false }: ChatMessageProps) {
   const isUser = message.role === "user";
   const textContent = getTextContent(message);
+  const steps = getStepsFromMessage(message);
   const [copied, setCopied] = useState(false);
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
@@ -170,6 +187,9 @@ export function ChatMessage({ message, videoPlatforms, streaming = false }: Chat
   }
 
   const mdComponents = makeMdComponents(videoPlatforms);
+
+  // Don't render assistant messages with no text and no steps
+  if (!isUser && !textContent && steps.length === 0) return null;
 
   if (isUser) {
     return (
@@ -192,7 +212,10 @@ export function ChatMessage({ message, videoPlatforms, streaming = false }: Chat
 
   return (
     <div className="group/msg flex flex-col gap-2">
-      <div className={cn(streaming && "cursor-blink")}>
+      <StepFeed steps={steps} hasText={textContent.length > 0} />
+
+      {textContent && (
+      <div className={cn("markdown", streaming && "cursor-blink")}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkMath]}
           rehypePlugins={[rehypeKatex]}
@@ -201,6 +224,7 @@ export function ChatMessage({ message, videoPlatforms, streaming = false }: Chat
           {textContent}
         </ReactMarkdown>
       </div>
+      )}
 
       <div className="flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity duration-150 -ml-1">
         <ActionBtn icon={copied ? Check : Copy} label="Copy" active={copied} onClick={handleCopy} />
