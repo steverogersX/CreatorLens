@@ -1,3 +1,5 @@
+export type ThreadStatus = "pending" | "streaming" | "completed" | "error";
+
 export interface ThreadVideoRow {
   position: number;
   url: string;

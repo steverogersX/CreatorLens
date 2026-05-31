@@ -78,7 +78,7 @@ export function playMockStream(threadId = MOCK_THREAD_ID): string {
   void (async () => {
     // -- thinking pause --
     await delay(500);
-    pushStreamEvent({ type: "agent_step", label: "Fetching video metadata", stepStatus: "running" });
+    pushStreamEvent({ type: "agent_step", platform: null, label: "Fetching video metadata", stepStatus: "running" });
 
     await delay(700);
     pushStreamEvent({ type: "video_meta", position: 1, meta: MOCK_META_A });
@@ -87,19 +87,19 @@ export function playMockStream(threadId = MOCK_THREAD_ID): string {
     pushStreamEvent({ type: "video_meta", position: 2, meta: MOCK_META_B });
 
     await delay(300);
-    pushStreamEvent({ type: "agent_step", label: "Fetching video metadata", stepStatus: "done" });
+    pushStreamEvent({ type: "agent_step", platform: null, label: "Fetching video metadata", stepStatus: "done" });
 
     await delay(80);
-    pushStreamEvent({ type: "agent_step", label: "Analyzing transcripts", stepStatus: "running" });
+    pushStreamEvent({ type: "agent_step", platform: null, label: "Analyzing transcripts", stepStatus: "running" });
 
     await delay(1_400);
-    pushStreamEvent({ type: "agent_step", label: "Analyzing transcripts", stepStatus: "done" });
+    pushStreamEvent({ type: "agent_step", platform: null, label: "Analyzing transcripts", stepStatus: "done" });
 
     await delay(80);
-    pushStreamEvent({ type: "agent_step", label: "Generating comparison", stepStatus: "running" });
+    pushStreamEvent({ type: "agent_step", platform: null, label: "Generating comparison", stepStatus: "running" });
 
     await delay(1_000);
-    pushStreamEvent({ type: "agent_step", label: "Generating comparison", stepStatus: "done" });
+    pushStreamEvent({ type: "agent_step", platform: null, label: "Generating comparison", stepStatus: "done" });
 
     await delay(250);
 

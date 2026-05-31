@@ -1,24 +1,10 @@
 // Module-level singleton — survives Next.js soft navigations in the browser.
 // Home page writes events here; /c/[threadId] subscribes and renders them.
 
-export interface LiveVideoMeta {
-  provider: string;
-  videoId: string;
-  title: string;
-  url: string;
-  views: number;
-  likes: number;
-  commentCount: number;
-  creator: { name: string; handle: string; followerCount: number; avatarUrl?: string };
-  duration: number;
-}
+import type { ChatSSEEvent } from "@shared/events";
 
-export type LiveEvent =
-  | { type: "video_meta"; position: number; meta: LiveVideoMeta }
-  | { type: "agent_step"; label: string; stepStatus: "running" | "done" }
-  | { type: "text_delta"; delta: string }
-  | { type: "done" }
-  | { type: "error"; message: string };
+export type { VideoMetaPayload as LiveVideoMeta } from "@shared/events";
+export type LiveEvent = ChatSSEEvent;
 
 type Listener = (event: LiveEvent) => void;
 
