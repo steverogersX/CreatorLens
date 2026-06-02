@@ -275,4 +275,22 @@
   color: transparent;
 }
 
+/* ── Step row shimmer — active step background sweep ─── */
+@keyframes stepRowShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.step-row-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--foreground) 5%, transparent) 40%,
+    color-mix(in oklch, var(--foreground) 9%, transparent) 50%,
+    color-mix(in oklch, var(--foreground) 5%, transparent) 60%,
+    transparent 100%
+  );
+  background-size: 300% 100%;
+  animation: stepRowShimmer 2s ease-in-out infinite;
+}
+
 @keyframes spin { to { transform: rotate(360deg); } }

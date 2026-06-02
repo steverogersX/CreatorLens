@@ -1,13 +1,17 @@
+import { PreviewCard } from "@base-ui/react/preview-card";
+import { Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { CitationPayload } from "@shared/events";
 
 type VideoPlatform = "youtube" | "instagram" | "twitter";
 
 interface CitationBadgeProps {
   video: "A" | "B";
-  timestamp?: string;
-  chunk?: number;
-  platform?: VideoPlatform;
-  snippet?: string;
+  /** Literal start label from the inline marker, e.g. "1:23". */
+  timestamp: string;
+  platform: VideoPlatform;
+  /** Resolved transcript range + text. Absent until the backend resolves the marker. */
+  citation?: CitationPayload;
 }
 
 function YTIcon({ size = 10 }: { size?: number }) {
@@ -45,79 +49,97 @@ const PLATFORM_ICON: Record<VideoPlatform, PlatformIconComponent> = {
 const PLATFORM_LABEL: Record<VideoPlatform, string> = {
   youtube: "YouTube",
   instagram: "Instagram",
-  twitter: "Twitter / X",
+  twitter: "X / Twitter",
 };
 
-export function CitationBadge({ video, timestamp, platform = "youtube", snippet }: CitationBadgeProps) {
+export function CitationBadge({ video, timestamp, platform, citation }: CitationBadgeProps) {
   const isA = video === "A";
   const Icon = PLATFORM_ICON[platform];
-  const tooltipText = timestamp ? `Video ${video} · ${timestamp}` : `Video ${video}`;
   const platformLabel = PLATFORM_LABEL[platform];
 
+  const startLabel = citation?.timestampLabel ?? timestamp;
+  const endLabel = citation?.endTimestampLabel;
+  const range = endLabel && endLabel !== startLabel ? `${startLabel} – ${endLabel}` : startLabel;
+
   return (
-    <span className="relative group/cite inline-flex items-center align-middle mx-[1px]">
-      {/* Badge pill */}
-      <span
+    <PreviewCard.Root>
+      <PreviewCard.Trigger
+        // Render inline so the badge sits naturally inside a markdown paragraph.
+        render={<span />}
+        delay={200}
+        closeDelay={120}
         className={cn(
-          "inline-flex items-center gap-[3px] px-1.5 h-[18px] rounded-[5px]",
-          "text-[9px] font-bold font-mono cursor-default select-none",
+          "inline-flex items-center gap-[3px] px-1.5 h-[18px] rounded-[5px] align-middle mx-[1px]",
+          "text-[9px] font-bold font-mono cursor-pointer select-none",
           "ring-1 ring-inset transition-colors duration-150",
           isA
-            ? "bg-foreground/12 text-foreground ring-foreground/25 group-hover/cite:bg-foreground/20"
-            : "bg-muted-foreground/12 text-muted-foreground ring-border group-hover/cite:bg-muted-foreground/20"
+            ? "bg-foreground/12 text-foreground ring-foreground/25 hover:bg-foreground/20"
+            : "bg-muted-foreground/12 text-muted-foreground ring-border hover:bg-muted-foreground/20",
         )}
       >
         <Icon size={8} />
         {video}
-      </span>
+      </PreviewCard.Trigger>
 
-      {/* Popup tooltip */}
-      <span className="absolute bottom-[calc(100%+10px)] left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-        <span
-          className={cn(
-            "flex flex-col gap-2 rounded-xl w-[240px]",
-            "bg-card border border-border/80 shadow-[0_8px_32px_rgba(0,0,0,0.6)]",
-            "opacity-0 group-hover/cite:opacity-100 transition-opacity duration-150 delay-100",
-            "overflow-hidden"
-          )}
-        >
-          {/* Header */}
-          <div className="flex items-center gap-2.5 px-3 pt-3">
-            <span className={cn(
-              "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0",
-              isA ? "bg-foreground/15 text-foreground" : "bg-muted-foreground/15 text-muted-foreground"
-            )}>
-              <Icon size={14} />
-            </span>
-            <div className="flex flex-col gap-0.5 min-w-0">
-              <span className="text-[12px] font-semibold font-mono text-foreground/90 leading-none">
-                {tooltipText}
+      <PreviewCard.Portal>
+        <PreviewCard.Positioner side="top" align="center" sideOffset={8} collisionPadding={12}>
+          <PreviewCard.Popup
+            className={cn(
+              "w-[280px] rounded-xl overflow-hidden z-50",
+              "bg-popover border border-border shadow-[0_12px_40px_rgba(0,0,0,0.45)]",
+              "origin-[var(--transform-origin)] transition-[transform,opacity] duration-150",
+              "data-[starting-style]:opacity-0 data-[starting-style]:scale-95",
+              "data-[ending-style]:opacity-0 data-[ending-style]:scale-95",
+            )}
+          >
+            {/* Header — platform identity + time range */}
+            <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-border/60">
+              <span
+                className={cn(
+                  "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                  isA ? "bg-foreground/15 text-foreground" : "bg-muted-foreground/15 text-muted-foreground",
+                )}
+              >
+                <Icon size={14} />
               </span>
-              <span className="text-[9px] text-muted-foreground/50 font-mono uppercase tracking-[0.08em]">
-                {platformLabel}
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="text-[12px] font-semibold text-foreground leading-none">
+                  Video {video}
+                </span>
+                <span className="text-[9px] text-muted-foreground/60 uppercase tracking-[0.08em] leading-none">
+                  {platformLabel}
+                </span>
+              </div>
+              <span className="ml-auto flex items-center gap-1 shrink-0 text-[10px] font-mono text-muted-foreground tabular-nums">
+                <Clock size={10} strokeWidth={2} />
+                {range}
               </span>
             </div>
-          </div>
 
-          {/* Snippet */}
-          {snippet && (
-            <>
-              <div className="h-px bg-border/50 mx-3" />
-              <div className="mx-3 mb-3 rounded-lg px-2.5 py-2 bg-secondary border border-border">
-                <p className="text-[11px] leading-[1.6] font-mono text-foreground/80">
-                  &ldquo;{snippet}&rdquo;
+            {/* Cited transcript — highlighted passage */}
+            {citation?.snippet ? (
+              <div className="px-3 py-2.5 max-h-[180px] overflow-y-auto custom-scrollbar">
+                <p className="text-[11.5px] leading-[1.65] text-foreground/90">
+                  <mark
+                    className={cn(
+                      "rounded px-0.5 py-px box-decoration-clone text-foreground",
+                      isA ? "bg-foreground/12" : "bg-muted-foreground/15",
+                    )}
+                  >
+                    {citation.snippet}
+                  </mark>
                 </p>
               </div>
-            </>
-          )}
-
-          {/* No snippet: bottom padding */}
-          {!snippet && <div className="pb-1" />}
-        </span>
-
-        {/* Arrow */}
-        <span className="block w-0 h-0 mx-auto border-x-[5px] border-x-transparent border-t-[5px] border-t-card" />
-      </span>
-    </span>
+            ) : (
+              <div className="px-3 py-2.5">
+                <p className="text-[11px] text-muted-foreground/60 italic">
+                  Transcript segment unavailable.
+                </p>
+              </div>
+            )}
+          </PreviewCard.Popup>
+        </PreviewCard.Positioner>
+      </PreviewCard.Portal>
+    </PreviewCard.Root>
   );
 }

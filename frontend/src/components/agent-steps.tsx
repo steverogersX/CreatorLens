@@ -41,22 +41,21 @@ function AgentStepsInner({ steps, hasText }: AgentStepsProps) {
   const isDone = steps.length > 0 && steps.every((s) => s.stepStatus === "done");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const startRef = useRef(Date.now());
-  const doneSecondsRef = useRef<number | null>(null);
+  const startRef = useRef<number | null>(null);
 
+  useEffect(() => {
+    startRef.current = Date.now();
+  }, []);
+
+  // Tick while running; the interval stops on done, freezing the last value.
   useEffect(() => {
     if (isDone) return;
-    const id = setInterval(
-      () => setElapsedSeconds(Math.round((Date.now() - startRef.current) / 1000)),
-      500,
-    );
+    const id = setInterval(() => {
+      if (startRef.current !== null) {
+        setElapsedSeconds(Math.round((Date.now() - startRef.current) / 1000));
+      }
+    }, 500);
     return () => clearInterval(id);
-  }, [isDone]);
-
-  useEffect(() => {
-    if (isDone && doneSecondsRef.current === null) {
-      doneSecondsRef.current = Math.max(1, Math.round((Date.now() - startRef.current) / 1000));
-    }
   }, [isDone]);
 
   // Auto-collapse 1.5s after text starts streaming
@@ -68,7 +67,7 @@ function AgentStepsInner({ steps, hasText }: AgentStepsProps) {
 
   if (steps.length === 0) return null;
 
-  const displaySeconds = doneSecondsRef.current ?? elapsedSeconds;
+  const displaySeconds = Math.max(1, elapsedSeconds);
 
   return (
     <div className="flex w-full flex-col">
@@ -115,7 +114,10 @@ function AgentStepsInner({ steps, hasText }: AgentStepsProps) {
                       <div className="absolute left-[11px] top-[26px] bottom-0 w-px bg-border/60" />
                     )}
 
-                    <div className="flex items-start gap-3">
+                    <div className={cn(
+                      "flex items-start gap-3 rounded-lg px-1.5 py-0.5 -mx-1.5",
+                      isActive && "step-row-shimmer",
+                    )}>
                       <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}

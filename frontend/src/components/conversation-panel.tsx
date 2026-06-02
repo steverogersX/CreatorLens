@@ -4,14 +4,14 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { UIMessage } from "ai";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/markdown";
-import { MessageItem, makeMdComponents, EMPTY_SNIPPETS } from "@/components/message-item";
+import { MessageItem, makeMdComponents, EMPTY_CITATIONS } from "@/components/message-item";
 import { AgentSteps, type AgentStep } from "@/components/agent-steps";
 import { SuggestedQuestions } from "@/components/suggested-questions";
-import { subscribeStream, getStreamUserMessage } from "@/lib/active-stream";
+import { subscribeStream, getStreamUserMessage, stopStream } from "@/lib/active-stream";
 import type { CitationPayload } from "@shared/events";
 
 type VideoPlatform = "youtube" | "instagram" | "twitter";
@@ -49,17 +49,20 @@ export function ConversationPanel({
     [platformA, platformB],
   );
 
-  const { messages, sendMessage, status, error, setMessages } = useChat({
+  const { messages, sendMessage, status, error, setMessages, stop } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      prepareSendMessagesRequest: ({ messages: msgs }) => {
+      prepareSendMessagesRequest: ({ messages: msgs, body }) => {
         const lastUser = msgs.findLast((m) => m.role === "user");
         const userMessage =
           lastUser?.parts
             .filter((p) => p.type === "text")
             .map((p) => (p as { type: "text"; text: string }).text)
             .join("") ?? "";
-        return { body: { type: "followup", threadId, userMessage } };
+        // `truncateTo` (set by edit/regenerate) tells the backend to drop the
+        // replaced messages before re-running.
+        const truncateTo = (body as { truncateTo?: number } | undefined)?.truncateTo;
+        return { body: { type: "followup", threadId, userMessage, truncateTo } };
       },
     }),
     messages: initialMessages ?? [],
@@ -88,18 +91,17 @@ export function ConversationPanel({
   const liveStepsRef = useRef<AgentStep[]>([]);
   const liveCitationsRef = useRef<CitationPayload[]>([]);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingMsgRef = useRef("");
 
-  const liveSnippetsMap = useMemo(() => {
-    if (liveCitations.length === 0) return EMPTY_SNIPPETS;
-    const m = new Map<string, string>();
-    liveCitations.forEach((c) => m.set(`${c.video}:${c.timestampLabel}`, c.snippet));
+  const liveCitationsMap = useMemo(() => {
+    if (liveCitations.length === 0) return EMPTY_CITATIONS;
+    const m = new Map<string, CitationPayload>();
+    liveCitations.forEach((c) => m.set(`${c.video}:${c.timestampLabel}`, c));
     return m;
   }, [liveCitations]);
 
   const liveMdComponents = useMemo(
-    () => makeMdComponents(videoPlatforms, liveSnippetsMap),
-    [videoPlatforms, liveSnippetsMap],
+    () => makeMdComponents(videoPlatforms, liveCitationsMap),
+    [videoPlatforms, liveCitationsMap],
   );
 
   useEffect(() => {
@@ -153,10 +155,6 @@ export function ConversationPanel({
       liveTextRef.current = "";
       liveStepsRef.current = [];
       liveCitationsRef.current = [];
-
-      const pending = pendingMsgRef.current;
-      pendingMsgRef.current = "";
-      if (pending) sendMessageRef.current({ text: pending });
     };
 
     const unsub = subscribeStream(threadId, (event) => {
@@ -226,6 +224,51 @@ export function ConversationPanel({
   const showThinking =
     status === "submitted" || (liveStreaming && liveSteps.length === 0 && !liveText);
 
+  // Last assistant message — the only one that can be regenerated.
+  const lastAssistantId = useMemo(
+    () => messages.filter((m) => m.role === "assistant").at(-1)?.id,
+    [messages],
+  );
+
+  const getMessageText = useCallback(
+    (id: string) =>
+      messages
+        .find((m) => m.id === id)
+        ?.parts.filter((p) => p.type === "text")
+        .map((p) => (p as { type: "text"; text: string }).text)
+        .join("") ?? "",
+    [messages],
+  );
+
+  // Edit a user message: drop it and everything after, then resend the new text
+  // as a fresh turn (backend truncates the stored thread to match).
+  const handleEdit = useCallback(
+    (id: string, newText: string) => {
+      const text = newText.trim();
+      if (!text || isFollowUpLoading) return;
+      const idx = messages.findIndex((m) => m.id === id);
+      if (idx < 0) return;
+      setMessages(messages.slice(0, idx));
+      sendMessage({ text }, { body: { truncateTo: idx } });
+    },
+    [messages, isFollowUpLoading, setMessages, sendMessage],
+  );
+
+  // Regenerate an assistant message: re-run its preceding user turn.
+  const handleRegenerate = useCallback(
+    (id: string) => {
+      if (isFollowUpLoading) return;
+      const idx = messages.findIndex((m) => m.id === id);
+      const userIdx = idx - 1;
+      if (userIdx < 0 || messages[userIdx]?.role !== "user") return;
+      const text = getMessageText(messages[userIdx]!.id);
+      if (!text) return;
+      setMessages(messages.slice(0, userIdx));
+      sendMessage({ text }, { body: { truncateTo: userIdx } });
+    },
+    [messages, isFollowUpLoading, setMessages, sendMessage, getMessageText],
+  );
+
   // ── Auto-scroll (rAF-throttled to avoid layout thrash on every token) ────
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollPendingRef = useRef(false);
@@ -241,28 +284,29 @@ export function ConversationPanel({
     scrollToBottom();
   }, [messages, liveText, liveSteps.length, showThinking, scrollToBottom]);
 
+  const isBusy = liveStreaming || isFollowUpLoading;
+
   function handleSend() {
     const msg = input.trim();
-    if (!msg) return;
-    if (liveStreaming) {
-      // Queue it — it fires automatically once the live stream commits.
-      pendingMsgRef.current = msg;
-      setInput("");
-      return;
-    }
-    if (isFollowUpLoading) return;
+    if (!msg || isBusy) return;
     sendMessage({ text: msg });
     setInput("");
+  }
+
+  function handleStop() {
+    if (liveStreaming) {
+      stopStream(threadId);
+    } else if (isFollowUpLoading) {
+      stop();
+    }
   }
 
   function handleKey(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      if (!isBusy) handleSend();
     }
   }
-
-  const isBusy = liveStreaming || isFollowUpLoading;
 
   return (
     <div className="flex flex-col h-full min-w-0 bg-background">
@@ -275,6 +319,10 @@ export function ConversationPanel({
               message={msg}
               videoPlatforms={videoPlatforms}
               streaming={msg.id === streamingMsgId}
+              isLastAssistant={msg.role === "assistant" && msg.id === lastAssistantId}
+              canRegenerate={!isBusy && msg.id === lastAssistantId}
+              onEdit={handleEdit}
+              onRegenerate={handleRegenerate}
             />
           ))}
 
@@ -334,38 +382,43 @@ export function ConversationPanel({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKey}
-              disabled={isFollowUpLoading && !liveStreaming}
               placeholder={
-                liveStreaming
-                  ? "Ask a follow-up — will send after analysis…"
-                  : "Ask anything about these videos…"
+                isBusy ? "Generating response…" : "Ask anything about these videos…"
               }
               className={cn(
                 "flex-1 resize-none bg-transparent",
                 "text-[14px] text-foreground placeholder:text-muted-foreground/35",
                 "outline-none font-sans leading-relaxed max-h-[140px] overflow-y-auto py-0.5",
-                "disabled:opacity-50",
               )}
             />
-            <Button
-              size="icon"
-              onClick={handleSend}
-              disabled={!input.trim() || (isFollowUpLoading && !liveStreaming)}
-              className={cn(
-                "rounded-xl mb-0.5",
-                !input.trim() || (isFollowUpLoading && !liveStreaming)
-                  ? "bg-secondary text-muted-foreground/30"
-                  : liveStreaming
-                    ? "bg-secondary text-foreground hover:bg-accent"
+            {isBusy ? (
+              <Button
+                size="icon"
+                onClick={handleStop}
+                aria-label="Stop generating"
+                className={cn(
+                  "rounded-xl mb-0.5",
+                  "bg-foreground text-background hover:bg-foreground/90 active:scale-95",
+                )}
+              >
+                <Square size={13} strokeWidth={0} className="fill-current" />
+              </Button>
+            ) : (
+              <Button
+                size="icon"
+                onClick={handleSend}
+                disabled={!input.trim()}
+                aria-label="Send message"
+                className={cn(
+                  "rounded-xl mb-0.5",
+                  !input.trim()
+                    ? "bg-secondary text-muted-foreground/30"
                     : "bg-foreground text-background hover:bg-foreground/90 active:scale-95",
-              )}
-            >
-              {isFollowUpLoading && !liveStreaming ? (
-                <span className="w-3 h-3 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground/60 animate-spin" />
-              ) : (
+                )}
+              >
                 <ArrowUp size={14} strokeWidth={2.5} />
-              )}
-            </Button>
+              </Button>
+            )}
           </div>
         </div>
       </div>

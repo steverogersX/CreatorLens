@@ -9,6 +9,13 @@ import {
 } from "@/components/ui/resizable";
 import type { UIMessage } from "ai";
 import type { ThreadVideoRow, ThreadStatus } from "@/types/thread";
+import type { CitationPayload } from "@shared/events";
+
+interface ThreadMessageRow {
+  role: string;
+  content: string;
+  citations?: CitationPayload[];
+}
 
 interface ThreadPageProps {
   params: Promise<{ threadId: string }>;
@@ -80,12 +87,21 @@ function videoRowToData(row: ThreadVideoRow, label: "A" | "B", accent: VideoAcce
   };
 }
 
-function dbMessagesToUIMessages(rows: Array<{ role: string; content: string }>): UIMessage[] {
-  return rows.map((row, i) => ({
-    id: `db-${i}`,
-    role: row.role as "user" | "assistant",
-    parts: [{ type: "text" as const, text: row.content }],
-  }));
+function dbMessagesToUIMessages(rows: ThreadMessageRow[]): UIMessage[] {
+  return rows.map((row, i) => {
+    const parts: UIMessage["parts"] = [{ type: "text" as const, text: row.content }];
+    if (row.citations && row.citations.length > 0) {
+      parts.push({
+        type: "data-citations",
+        data: { citations: row.citations },
+      } as unknown as UIMessage["parts"][number]);
+    }
+    return {
+      id: `db-${i}`,
+      role: row.role as "user" | "assistant",
+      parts,
+    };
+  });
 }
 
 function emptyVideo(label: "A" | "B", accent: VideoAccent): VideoData {
@@ -124,7 +140,7 @@ export default async function ThreadPage({ params }: ThreadPageProps) {
       threadId: string;
       status: ThreadStatus;
       videos: ThreadVideoRow[];
-      messages: Array<{ role: string; content: string }>;
+      messages: ThreadMessageRow[];
     };
   };
   const { data } = json;
