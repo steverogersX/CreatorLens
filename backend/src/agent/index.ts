@@ -1,6 +1,9 @@
 import { graph, graphConfig } from "./graph";
 import { resolveCitations } from "./citations";
 import type { RequestEventBus } from "@/lib/event-bus";
+import { logger } from "@/lib/logger";
+
+const log = logger.child({ module: "agent" });
 
 export async function runAgent(threadId: string, userMessage: string): Promise<string> {
   const result = await graph.invoke(
@@ -25,16 +28,19 @@ export async function streamAgent(
   threadId: string,
   userMessage: string,
   bus: RequestEventBus,
+  signal?: AbortSignal,
 ): Promise<string> {
   const events = graph.streamEvents(
     { threadId, userMessage },
-    { version: "v2", ...graphConfig },
+    { version: "v2", signal, ...graphConfig },
   );
 
   let fullContent = "";
   let responseStepStarted = false;
 
-  for await (const event of events) {
+  try {
+    for await (const event of events) {
+    if (signal?.aborted) break;
     if (event.event === "on_tool_start") {
       const label = toolLabel(event.name as string);
       bus.publish({ type: "agent_step", platform: null, label, stepStatus: "running" });
@@ -65,6 +71,18 @@ export async function streamAgent(
       fullContent += content;
       bus.publish({ type: "text_delta", delta: content });
     }
+    }
+  } catch (err) {
+    // A client-initiated stop aborts the run; surface the partial answer
+    // instead of throwing so it can be persisted and shown.
+    if (signal?.aborted) {
+      if (responseStepStarted) {
+        bus.publish({ type: "agent_step", platform: null, label: "Generating response", stepStatus: "done" });
+      }
+      log.info({ threadId, partialLength: fullContent.length }, "[streamAgent] stopped by client");
+      return fullContent;
+    }
+    throw err;
   }
 
   if (responseStepStarted) {
