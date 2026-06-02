@@ -13,13 +13,25 @@ let _buffer: LiveEvent[] = [];
 let _listeners = new Set<Listener>();
 let _done = false;
 let _userMessage = "";
+let _abort: AbortController | null = null;
 
-export function initStream(threadId: string, userMessage = ""): void {
+export function initStream(threadId: string, userMessage = "", abort: AbortController | null = null): void {
   _threadId = threadId;
   _buffer = [];
   _listeners = new Set();
   _done = false;
   _userMessage = userMessage;
+  _abort = abort;
+}
+
+/**
+ * Client-initiated stop: aborts the underlying fetch and emits a synthetic
+ * `done` so subscribers commit whatever was streamed so far.
+ */
+export function stopStream(threadId: string): void {
+  if (_threadId !== threadId || _done) return;
+  _abort?.abort();
+  pushStreamEvent({ type: "done" });
 }
 
 /** The user message that kicked off this stream — used to render/commit the user bubble on the thread page. */

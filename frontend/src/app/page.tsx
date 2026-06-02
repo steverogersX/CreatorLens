@@ -266,11 +266,14 @@ export default function Home() {
     void (async () => {
       let navigated = false;
       let threadId: string | null = null;
+      // Owned by the active-stream store so the thread page's Stop button can abort it.
+      const abort = new AbortController();
       try {
         const res = await fetch("/api/stream", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "new", urls: [urlA, urlB], userMessage }),
+          signal: abort.signal,
         });
 
         if (!res.ok || !res.body) {
@@ -304,7 +307,7 @@ export default function Home() {
 
             if (event["type"] === "thread_created" && !navigated) {
               threadId = event["threadId"] as string;
-              initStream(threadId, userMessage);
+              initStream(threadId, userMessage, abort);
               navigated = true;
               setIsSubmitting(false);
               router.push(`/c/${threadId}`);

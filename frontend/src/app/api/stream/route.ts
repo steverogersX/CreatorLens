@@ -24,11 +24,18 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "Invalid request" }, { status: 422 });
   }
 
-  const backendRes = await fetch(`${BACKEND_URL}/api/v1/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(parsed.data),
-  });
+  let backendRes: Response;
+  try {
+    backendRes = await fetch(`${BACKEND_URL}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(parsed.data),
+      // Propagate a client Stop / disconnect to the backend so the agent halts.
+      signal: req.signal,
+    });
+  } catch {
+    return new Response(null, { status: 499 });
+  }
 
   if (!backendRes.ok || !backendRes.body) {
     return Response.json({ error: "Backend unavailable" }, { status: 502 });

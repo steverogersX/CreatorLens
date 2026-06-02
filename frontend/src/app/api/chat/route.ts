@@ -16,6 +16,7 @@ const followUpSchema = z.object({
   type: z.literal("followup"),
   threadId: z.string().uuid(),
   userMessage: z.string().min(1),
+  truncateTo: z.number().int().nonnegative().optional(),
 });
 
 const chatRequestSchema = z.discriminatedUnion("type", [newThreadSchema, followUpSchema]);
@@ -33,11 +34,19 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: parsed.error.issues }, { status: 422 });
   }
 
-  const backendRes = await fetch(`${BACKEND_URL}/api/v1/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(parsed.data),
-  });
+  let backendRes: Response;
+  try {
+    backendRes = await fetch(`${BACKEND_URL}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(parsed.data),
+      // Propagate a client Stop / disconnect to the backend so the agent halts.
+      signal: req.signal,
+    });
+  } catch {
+    // Client aborted before the backend responded — nothing to stream.
+    return new Response(null, { status: 499 });
+  }
 
   if (!backendRes.ok || !backendRes.body) {
     return Response.json({ error: "Backend unavailable" }, { status: 502 });
