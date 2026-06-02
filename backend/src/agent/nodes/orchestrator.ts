@@ -5,8 +5,6 @@ import { buildOrchestratorSystemPrompt } from "../prompts/orchestrator.prompt";
 import { tools } from "../tools/index";
 import { createModel } from "../model";
 import { logger } from "@/lib/logger";
-import { config } from "@/config";
-
 const log = logger.child({ node: "orchestrator" });
 
 const model = createModel(tools);
@@ -28,7 +26,7 @@ export async function orchestratorNode(
   const systemPrompt = buildOrchestratorSystemPrompt(state);
 
   log.info(
-    { provider: config.LLM_PROVIDER, model: config.LLM_MODEL, messageCount: state.messages.length },
+    { messageCount: state.messages.length },
     "[orchestrator] invoking model",
   );
 
