@@ -24,6 +24,9 @@ export interface VideoData {
   comments: string;
   duration: string;
   engagementRate: number;
+  thumbnailUrl?: string;
+  sourceUrl?: string;
+  retweets?: string;
 }
 
 const ASPECT_CLASS: Record<string, string> = {
@@ -133,9 +136,9 @@ export function VideoCard({ video, index = 0, isLoading = false }: VideoCardProp
         </div>
       </div>
 
-      {/* Embed */}
+      {/* Embed / thumbnail */}
       <div className={cn("relative w-full rounded-xl overflow-hidden border border-border bg-black", aspectClass)}>
-        {videoId ? (
+        {platform === "youtube" && videoId ? (
           <iframe
             src={cfg.embedUrl(videoId)}
             title={title}
@@ -143,6 +146,25 @@ export function VideoCard({ video, index = 0, isLoading = false }: VideoCardProp
             allowFullScreen
             className="absolute inset-0 w-full h-full"
           />
+        ) : video.thumbnailUrl ? (
+          /* Social platforms: thumbnail image + "watch on platform" overlay */
+          <a
+            href={video.sourceUrl ?? "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute inset-0 group"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={video.thumbnailUrl}
+              alt={title}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+              <PlatformIcon className="w-5 h-5 text-white" />
+              <span className="text-white text-[12px] font-semibold">Watch on {cfg.name}</span>
+            </div>
+          </a>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-accent/40">
             <PlatformIcon className="w-8 h-8 text-muted-foreground/30" />
@@ -207,6 +229,7 @@ export function VideoCard({ video, index = 0, isLoading = false }: VideoCardProp
           likes={video.likes}
           comments={video.comments}
           duration={video.duration}
+          retweets={video.retweets}
           platform={platform}
         />
       )}

@@ -20,5 +20,7 @@ export interface ThreadVideoRow {
   creatorName: string;
   creatorHandle: string;
   creatorFollowerCount: number;
+  thumbnailUrl?: string | null;
+  retweets?: number | null;
   duration: number;
 }

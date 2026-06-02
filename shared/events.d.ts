@@ -12,9 +12,11 @@ export interface VideoMetaPayload {
   videoId: string;
   title: string;
   url: string;
+  thumbnailUrl?: string;
   views: number;
   likes: number;
   commentCount: number;
+  retweets?: number;
   creator: VideoCreatorPayload;
   duration: number;
 }

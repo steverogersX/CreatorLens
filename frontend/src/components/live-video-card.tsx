@@ -35,6 +35,9 @@ function metaToVideoData(meta: LiveVideoMeta, label: "A" | "B", accent: VideoAcc
     comments: meta.commentCount.toLocaleString(),
     duration: `${Math.floor(meta.duration / 60)}:${String(Math.floor(meta.duration % 60)).padStart(2, "0")}`,
     engagementRate: meta.views > 0 ? parseFloat(((meta.likes / meta.views) * 100).toFixed(1)) : 0,
+    thumbnailUrl: meta.thumbnailUrl,
+    sourceUrl: meta.url,
+    retweets: meta.retweets != null ? meta.retweets.toLocaleString() : undefined,
   };
 }
 
