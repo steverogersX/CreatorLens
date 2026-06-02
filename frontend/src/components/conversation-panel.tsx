@@ -5,6 +5,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { UIMessage } from "ai";
 import { ArrowUp, Square } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/markdown";
@@ -33,8 +34,29 @@ const SUGGESTED = [
   "Summarize key differences",
 ];
 
-// Batch live deltas so the Markdown re-parses ~11×/s instead of on every token.
-const LIVE_FLUSH_MS = 90;
+// Batch live deltas so re-renders run at ~22/s — smooth without thrashing.
+const LIVE_FLUSH_MS = 45;
+
+/* ── Breathing bubbles — shown while waiting for the first token ─── */
+function BreathingBubbles() {
+  return (
+    <div className="flex items-center gap-[6px] py-1 h-8">
+      {[0, 1, 2].map((i) => (
+        <motion.span
+          key={i}
+          className="block w-[7px] h-[7px] rounded-full bg-muted-foreground/40"
+          animate={{ scale: [0.5, 1, 0.5] }}
+          transition={{
+            duration: 1.2,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: i * 0.18,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 export function ConversationPanel({
   threadId,
@@ -326,31 +348,33 @@ export function ConversationPanel({
             />
           ))}
 
-          {showThinking && (
-            <div className="flex items-center gap-3 py-1">
-              <div className="flex gap-1">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-pulse"
-                    style={{ animationDelay: `${i * 180}ms` }}
-                  />
-                ))}
-              </div>
-              <span className="text-[13px] text-muted-foreground/50 thinking-shimmer">
-                {liveStreaming ? "Analyzing videos…" : "Thinking…"}
-              </span>
-            </div>
-          )}
+          <AnimatePresence>
+            {showThinking && (
+              <motion.div
+                key="thinking-bubbles"
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.75 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+              >
+                <BreathingBubbles />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Live streaming assistant message (first visit only) */}
           {liveStreaming && (liveSteps.length > 0 || liveText) && (
             <div className="flex flex-col gap-2 min-w-0">
               <AgentSteps steps={liveSteps} hasText={liveText.length > 0} />
               {liveText && (
-                <div className={cn("markdown min-w-0 max-w-full", "cursor-blink")}>
+                <motion.div
+                  className="markdown min-w-0 max-w-full"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                >
                   <Markdown text={liveText} components={liveMdComponents} />
-                </div>
+                </motion.div>
               )}
             </div>
           )}

@@ -11,17 +11,20 @@ import rehypeKatex from "rehype-katex";
 const REMARK_PLUGINS = [remarkGfm, remarkMath];
 const REHYPE_PLUGINS = [rehypeKatex];
 
+// [A:MM:SS] / [B:MM:SS] look like Markdown link references to remark, which
+// processes them as DOM nodes rather than plain text — breaking splitOnCitations.
+// Escaping the brackets first makes remark emit them as literal text characters.
+const CITE_MARKER_RE = /\[([AB]):(\d+:\d+)\]/g;
+
+function escapeCitationMarkers(text: string): string {
+  return text.replace(CITE_MARKER_RE, "\\[$1:$2\\]");
+}
+
 interface MarkdownProps {
   text: string;
   components: Components;
 }
 
-/**
- * Memoized Markdown renderer. ReactMarkdown re-parses its full input on every
- * render, so during streaming (where the parent re-renders on every token) this
- * memo skips the parse unless `text` or `components` actually changed. Pair with
- * a throttled `text` to bound parse frequency.
- */
 export const Markdown = memo(function Markdown({ text, components }: MarkdownProps) {
   return (
     <ReactMarkdown
@@ -29,7 +32,7 @@ export const Markdown = memo(function Markdown({ text, components }: MarkdownPro
       rehypePlugins={REHYPE_PLUGINS}
       components={components}
     >
-      {text}
+      {escapeCitationMarkers(text)}
     </ReactMarkdown>
   );
 });
