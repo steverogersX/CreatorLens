@@ -48,7 +48,7 @@ export async function POST(req: Request): Promise<Response> {
       const reader = backendRes.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let textPartId = "text-0";
+      const textPartId = "text-0";
       let textStarted = false;
 
       while (true) {
@@ -109,6 +109,13 @@ export async function POST(req: Request): Promise<Response> {
                 writer.write({ type: "text-end", id: textPartId });
                 textStarted = false;
               }
+              break;
+
+            case "citations":
+              writer.write({
+                type: "data-citations",
+                data: { citations: event["citations"] },
+              });
               break;
 
             case "error":
