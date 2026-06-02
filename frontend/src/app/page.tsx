@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Aperture, ArrowUp, X, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { initStream, pushStreamEvent, type LiveEvent } from "@/lib/active-stream";
 import { playMockStream, MOCK_THREAD_ID } from "@/lib/mock-stream";
 import { cn } from "@/lib/utils";
@@ -61,7 +62,6 @@ const PLATFORM_ICON: Record<Platform, React.FC<{ className?: string }>> = {
   twitter: XIcon,
 };
 
-// Monochrome — platform recognition comes from the glyph shape, not colour.
 const PLATFORM_COLOR: Record<Platform, string> = {
   youtube: "text-foreground/70",
   instagram: "text-foreground/70",
@@ -76,16 +76,21 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   }, [onDone]);
 
   return (
-    <div className={cn(
-      "fixed bottom-6 left-1/2 -translate-x-1/2 z-50",
-      "flex items-center gap-2 px-4 py-2.5 rounded-xl",
-      "bg-card border border-border/80 shadow-[0_8px_32px_rgba(0,0,0,0.6)]",
-      "text-[13px] text-foreground/90 font-medium",
-      "animate-in fade-in slide-in-from-bottom-2 duration-200"
-    )}>
+    <motion.div
+      className={cn(
+        "fixed bottom-6 left-1/2 -translate-x-1/2 z-50",
+        "flex items-center gap-2 px-4 py-2.5 rounded-xl",
+        "bg-card border border-border/80 shadow-[0_8px_32px_rgba(0,0,0,0.6)]",
+        "text-[13px] text-foreground/90 font-medium",
+      )}
+      initial={{ opacity: 0, y: 12, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 380, damping: 28, mass: 0.7 }}
+    >
       <span className="w-1.5 h-1.5 rounded-full bg-destructive/80 shrink-0" />
       {message}
-    </div>
+    </motion.div>
   );
 }
 
@@ -110,7 +115,6 @@ function UrlChip({
       "flex items-center gap-2 pr-1.5 pl-1.5 h-10 rounded-xl border border-border shrink-0",
       "bg-secondary transition-colors duration-150",
     )}>
-      {/* Thumbnail or icon */}
       {ytId ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -124,7 +128,6 @@ function UrlChip({
         </div>
       )}
 
-      {/* Label + domain */}
       <div className="flex flex-col leading-none gap-0.5 min-w-0">
         <span className={cn(
           "text-[10px] font-bold font-mono tracking-widest",
@@ -140,7 +143,6 @@ function UrlChip({
         </span>
       </div>
 
-      {/* Remove */}
       <button
         onClick={onRemove}
         className="ml-1 w-5 h-5 rounded-md flex items-center justify-center text-muted-foreground/40 hover:text-foreground hover:bg-secondary transition-all duration-100 shrink-0"
@@ -158,6 +160,26 @@ const EXAMPLES = [
   "Which is better for beginners?",
 ];
 
+/* ── Animation variants ────────────────────────────────────── */
+const SPRING_PAGE = { type: "spring" as const, stiffness: 340, damping: 28, mass: 0.7 };
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.09, delayChildren: 0.05 },
+  },
+};
+
+const sectionVariants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: SPRING_PAGE,
+  },
+};
+
 /* ── Landing page ──────────────────────────────────────────── */
 export default function Home() {
   const router = useRouter();
@@ -167,8 +189,6 @@ export default function Home() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Mock flag is client-only (env + URL). useSyncExternalStore returns false
-  // during SSR and the real value on the client — no hydration mismatch.
   const isMock = useSyncExternalStore(
     () => () => {},
     () =>
@@ -179,7 +199,6 @@ export default function Home() {
 
   const canSubmit = (videoUrls.length === 2 || isMock) && !isSubmitting;
 
-  // auto-grow
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -194,7 +213,7 @@ export default function Home() {
   function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
     const pasted = e.clipboardData.getData("text");
     const foundUrls = findVideoUrls(pasted);
-    if (foundUrls.length === 0) return; // normal paste
+    if (foundUrls.length === 0) return;
 
     e.preventDefault();
 
@@ -214,14 +233,12 @@ export default function Home() {
       showToast("Only 2 videos allowed — extra URLs skipped");
     }
 
-    // keep non-URL text as question
     const nonUrl = pasted.replace(VIDEO_URL_RE, "").replace(/\s{2,}/g, " ").trim();
     if (nonUrl) setQuestion((prev) => (prev ? `${prev} ${nonUrl}` : nonUrl));
   }
 
   function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const val = e.target.value;
-    // detect if a full URL was typed/pasted through onChange (fallback)
     const urls = findVideoUrls(val);
     if (urls.length > 0) {
       const slots = 2 - videoUrls.length;
@@ -247,7 +264,6 @@ export default function Home() {
   function handleSubmit() {
     if (!canSubmit) return;
 
-    // ── Mock mode ─────────────────────────────────────────────────────────────
     if (isMock) {
       setIsSubmitting(true);
       const tid = playMockStream(MOCK_THREAD_ID);
@@ -257,7 +273,6 @@ export default function Home() {
       }, 300);
       return;
     }
-    // ─────────────────────────────────────────────────────────────────────────
 
     const [urlA, urlB] = videoUrls;
     const userMessage = question.trim() || "Compare these two videos";
@@ -266,7 +281,6 @@ export default function Home() {
     void (async () => {
       let navigated = false;
       let threadId: string | null = null;
-      // Owned by the active-stream store so the thread page's Stop button can abort it.
       const abort = new AbortController();
       try {
         const res = await fetch("/api/stream", {
@@ -312,7 +326,7 @@ export default function Home() {
               setIsSubmitting(false);
               router.push(`/c/${threadId}`);
             } else if (event["type"] === "error" && !navigated) {
-              navigated = true; // prevent fallback toast from firing too
+              navigated = true;
               setIsSubmitting(false);
               showToast((event["message"] as string | undefined) ?? "Something went wrong — please try again");
             } else if (threadId) {
@@ -321,7 +335,6 @@ export default function Home() {
           }
         }
 
-        // Stream closed before any event was received
         if (!navigated) {
           setIsSubmitting(false);
           showToast("Something went wrong — please try again");
@@ -351,102 +364,154 @@ export default function Home() {
 
   return (
     <div className="h-full flex flex-col items-center justify-center bg-background px-4 overflow-y-auto custom-scrollbar">
-      <div className="flex flex-col items-center w-full max-w-[640px] py-10">
-        <div className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-foreground shadow-sm">
+      <motion.div
+        className="flex flex-col items-center w-full max-w-[640px] py-10"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        {/* Logo */}
+        <motion.div
+          variants={sectionVariants}
+          className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-foreground shadow-sm"
+          whileHover={{ scale: 1.06, rotate: 6 }}
+          transition={{ type: "spring", stiffness: 380, damping: 22 }}
+        >
           <Aperture size={22} className="text-background" strokeWidth={2} />
-        </div>
+        </motion.div>
 
         {isMock && (
-          <div className="mb-4 px-2.5 py-1 rounded-full bg-secondary border border-border text-[11px] font-mono text-muted-foreground tracking-widest">
+          <motion.div variants={sectionVariants} className="mb-4 px-2.5 py-1 rounded-full bg-secondary border border-border text-[11px] font-mono text-muted-foreground tracking-widest">
             MOCK MODE
-          </div>
+          </motion.div>
         )}
-        <h1 className="text-[30px] leading-tight font-semibold tracking-tight text-foreground text-center mb-2">
+
+        {/* Headline */}
+        <motion.h1
+          variants={sectionVariants}
+          className="text-[30px] leading-tight font-semibold tracking-tight text-foreground text-center mb-2"
+        >
           Compare any two videos with AI
-        </h1>
-        <p className="text-[14.5px] text-muted-foreground text-center mb-8">
+        </motion.h1>
+
+        {/* Subtitle */}
+        <motion.p
+          variants={sectionVariants}
+          className="text-[14.5px] text-muted-foreground text-center mb-8"
+        >
           Paste two video URLs — add a question, or just hit enter to compare.
-        </p>
+        </motion.p>
 
-      {/* Input card */}
-      <div className="w-full">
-        <div className={cn(
-          "flex flex-col bg-card border rounded-2xl px-4 py-4 shadow-sm",
-          "transition-colors duration-150 border-border",
-          "focus-within:border-foreground/30 focus-within:ring-4 focus-within:ring-foreground/5",
-        )}>
-          {/* URL chips row */}
-          {videoUrls.length > 0 && (
-            <div className="flex items-center gap-2 mb-3 flex-wrap">
-              {videoUrls.map((url, i) => (
-                <UrlChip
-                  key={url}
-                  url={url}
-                  label={i === 0 ? "A" : "B"}
-                  onRemove={() => removeUrl(i)}
-                />
-              ))}
-            </div>
-          )}
+        {/* Input card */}
+        <motion.div variants={sectionVariants} className="w-full">
+          <div className={cn(
+            "flex flex-col bg-card border rounded-2xl px-4 py-4 shadow-sm",
+            "transition-colors duration-150 border-border",
+            "focus-within:border-foreground/30 focus-within:ring-4 focus-within:ring-foreground/5",
+          )}>
+            {/* URL chips row */}
+            <AnimatePresence mode="popLayout">
+              {videoUrls.length > 0 && (
+                <motion.div
+                  key="chips-row"
+                  className="flex items-center gap-2 mb-3 flex-wrap"
+                  initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  animate={{ opacity: 1, height: "auto", marginBottom: 12 }}
+                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  transition={{ type: "spring", stiffness: 380, damping: 30, mass: 0.7 }}
+                >
+                  <AnimatePresence mode="popLayout">
+                    {videoUrls.map((url, i) => (
+                      <motion.div
+                        key={url}
+                        initial={{ opacity: 0, scale: 0.78, y: -6 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.78, y: -6 }}
+                        transition={{ type: "spring", stiffness: 420, damping: 28, mass: 0.6 }}
+                      >
+                        <UrlChip
+                          url={url}
+                          label={i === 0 ? "A" : "B"}
+                          onRemove={() => removeUrl(i)}
+                        />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          {/* Textarea */}
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            value={question}
-            onChange={handleChange}
-            onPaste={handlePaste}
-            onKeyDown={handleKey}
-            placeholder={placeholder}
-            className={cn(
-              "w-full resize-none bg-transparent outline-none",
-              "text-[14px] text-foreground placeholder:text-muted-foreground/35",
-              "leading-relaxed max-h-[160px] overflow-y-auto font-sans"
-            )}
-          />
-
-          {/* Bottom bar */}
-          <div className="flex items-center justify-between mt-3">
-            <span className="text-[11px] text-muted-foreground/35 font-mono">
-              {videoUrls.length === 2 ? "shift+enter for new line" : `${2 - videoUrls.length} more video URL needed`}
-            </span>
-            <button
-              onClick={handleSubmit}
-              disabled={!canSubmit}
+            {/* Textarea */}
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={question}
+              onChange={handleChange}
+              onPaste={handlePaste}
+              onKeyDown={handleKey}
+              placeholder={placeholder}
               className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                "transition-all duration-150",
-                canSubmit
-                  ? "bg-foreground text-background hover:bg-foreground/85 hover:scale-105 active:scale-95"
-                  : "bg-border/40 text-muted-foreground/25 cursor-not-allowed"
+                "w-full resize-none bg-transparent outline-none",
+                "text-[14px] text-foreground placeholder:text-muted-foreground/35",
+                "leading-relaxed max-h-[160px] overflow-y-auto font-sans"
               )}
-            >
-              {isSubmitting ? (
-                <Loader2 size={13} strokeWidth={2} className="animate-spin" />
-              ) : (
-                <ArrowUp size={14} strokeWidth={2.5} />
-              )}
-            </button>
-          </div>
-        </div>
+            />
 
-        {/* Example prompts */}
-        <div className="flex flex-wrap items-center gap-2 mt-4 justify-center">
-          {EXAMPLES.map((q) => (
-            <button
-              key={q}
-              onClick={() => { setQuestion(q); textareaRef.current?.focus(); }}
-              className="text-[12px] text-muted-foreground border border-border/40 rounded-full px-3.5 py-1.5 transition-all duration-150 hover:text-foreground hover:border-border hover:bg-secondary/50"
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-      </div>
-      </div>
+            {/* Bottom bar */}
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-[11px] text-muted-foreground/35 font-mono">
+                {videoUrls.length === 2 ? "shift+enter for new line" : `${2 - videoUrls.length} more video URL needed`}
+              </span>
+              <motion.button
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                  "transition-colors duration-150",
+                  canSubmit
+                    ? "bg-foreground text-background hover:bg-foreground/85 cursor-pointer"
+                    : "bg-border/40 text-muted-foreground/25 cursor-not-allowed"
+                )}
+                whileHover={canSubmit ? { scale: 1.1 } : {}}
+                whileTap={canSubmit ? { scale: 0.88 } : {}}
+                transition={{ type: "spring", stiffness: 420, damping: 24 }}
+              >
+                {isSubmitting ? (
+                  <Loader2 size={13} strokeWidth={2} className="animate-spin" />
+                ) : (
+                  <ArrowUp size={14} strokeWidth={2.5} />
+                )}
+              </motion.button>
+            </div>
+          </div>
+
+          {/* Example prompts */}
+          <motion.div
+            variants={sectionVariants}
+            className="flex flex-wrap items-center gap-2 mt-4 justify-center"
+          >
+            {EXAMPLES.map((q) => (
+              <motion.button
+                key={q}
+                onClick={() => { setQuestion(q); textareaRef.current?.focus(); }}
+                className="text-[12px] text-muted-foreground border border-border/40 rounded-full px-3.5 py-1.5 transition-colors duration-150 hover:text-foreground hover:border-border hover:bg-secondary/50"
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                transition={{ type: "spring", stiffness: 400, damping: 26 }}
+              >
+                {q}
+              </motion.button>
+            ))}
+          </motion.div>
+        </motion.div>
+      </motion.div>
 
       {/* Toast */}
-      {toast && <Toast message={toast} onDone={() => setToast(null)} />}
+      <AnimatePresence>
+        {toast && (
+          <Toast key="toast" message={toast} onDone={() => setToast(null)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

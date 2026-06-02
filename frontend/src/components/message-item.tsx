@@ -11,8 +11,8 @@ import { useThrottledValue } from "@/lib/use-throttled-value";
 import type { UIMessage, TextUIPart } from "ai";
 import type { CitationPayload } from "@shared/events";
 
-// Cap full Markdown re-parses to ~12/s while a message streams token-by-token.
-const STREAM_THROTTLE_MS = 80;
+// Cap full Markdown re-parses to ~22/s — smooth without thrashing.
+const STREAM_THROTTLE_MS = 45;
 
 export type Message = UIMessage;
 
@@ -349,7 +349,7 @@ function MessageItemInner({
       <AgentSteps steps={steps} hasText={textContent.length > 0} />
 
       {textContent && (
-        <div className={cn("markdown min-w-0 max-w-full", streaming && "cursor-blink")}>
+        <div className="markdown min-w-0 max-w-full">
           <Markdown text={throttledText} components={mdComponents} />
         </div>
       )}
