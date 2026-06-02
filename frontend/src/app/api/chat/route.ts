@@ -99,7 +99,12 @@ export async function POST(req: Request): Promise<Response> {
             case "agent_step":
               writer.write({
                 type: "data-agent-step",
-                data: { label: event["label"], platform: event["platform"], stepStatus: event["stepStatus"] },
+                data: {
+                  label: event["label"],
+                  platform: event["platform"],
+                  tool: event["tool"] ?? null,
+                  stepStatus: event["stepStatus"],
+                },
               });
               break;
 

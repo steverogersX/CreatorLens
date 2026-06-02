@@ -187,9 +187,17 @@ export function ConversationPanel({
           const next =
             idx >= 0
               ? arr.map((s, i) =>
-                  i === idx ? { label: s.label, stepStatus: event.stepStatus } : s,
+                  i === idx ? { ...s, stepStatus: event.stepStatus } : s,
                 )
-              : [...arr, { label: event.label, stepStatus: event.stepStatus }];
+              : [
+                  ...arr,
+                  {
+                    label: event.label,
+                    stepStatus: event.stepStatus,
+                    tool: event.tool,
+                    platform: event.platform,
+                  },
+                ];
           liveStepsRef.current = next;
           setLiveSteps(next);
           break;

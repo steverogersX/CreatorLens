@@ -78,28 +78,30 @@ export function playMockStream(threadId = MOCK_THREAD_ID): string {
   void (async () => {
     // -- thinking pause --
     await delay(500);
-    pushStreamEvent({ type: "agent_step", platform: null, label: "Fetching video metadata", stepStatus: "running" });
+    pushStreamEvent({ type: "agent_step", platform: "www.youtube.com", tool: null, label: "Analyzing YouTube video", stepStatus: "running" });
 
     await delay(700);
     pushStreamEvent({ type: "video_meta", position: 1, meta: MOCK_META_A });
+    pushStreamEvent({ type: "video_ready", position: 1 });
 
     await delay(350);
     pushStreamEvent({ type: "video_meta", position: 2, meta: MOCK_META_B });
+    pushStreamEvent({ type: "video_ready", position: 2 });
 
     await delay(300);
-    pushStreamEvent({ type: "agent_step", platform: null, label: "Fetching video metadata", stepStatus: "done" });
+    pushStreamEvent({ type: "agent_step", platform: "www.youtube.com", tool: null, label: "Analyzing YouTube video", stepStatus: "done" });
 
     await delay(80);
-    pushStreamEvent({ type: "agent_step", platform: null, label: "Analyzing transcripts", stepStatus: "running" });
+    pushStreamEvent({ type: "agent_step", platform: null, tool: "search_video_transcript", label: "Searching transcript", stepStatus: "running" });
 
     await delay(1_400);
-    pushStreamEvent({ type: "agent_step", platform: null, label: "Analyzing transcripts", stepStatus: "done" });
+    pushStreamEvent({ type: "agent_step", platform: null, tool: "search_video_transcript", label: "Searching transcript", stepStatus: "done" });
 
     await delay(80);
-    pushStreamEvent({ type: "agent_step", platform: null, label: "Generating comparison", stepStatus: "running" });
+    pushStreamEvent({ type: "agent_step", platform: null, tool: null, label: "Generating response", stepStatus: "running" });
 
     await delay(1_000);
-    pushStreamEvent({ type: "agent_step", platform: null, label: "Generating comparison", stepStatus: "done" });
+    pushStreamEvent({ type: "agent_step", platform: null, tool: null, label: "Generating response", stepStatus: "done" });
 
     await delay(250);
 

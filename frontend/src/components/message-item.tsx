@@ -38,18 +38,18 @@ function getTextContent(message: Message): string {
 }
 
 function getStepsFromMessage(message: Message): AgentStep[] {
-  const map = new Map<string, "running" | "done">();
+  const map = new Map<string, AgentStep>();
   const order: string[] = [];
   for (const part of message.parts) {
     if (part.type === "data-agent-step") {
-      const { label, stepStatus } = (
+      const { label, stepStatus, tool = null, platform = null } = (
         part as unknown as { type: string; data: AgentStep }
       ).data;
       if (!map.has(label)) order.push(label);
-      map.set(label, stepStatus);
+      map.set(label, { label, stepStatus, tool, platform });
     }
   }
-  return order.map((label) => ({ label, stepStatus: map.get(label)! }));
+  return order.map((label) => map.get(label)!);
 }
 
 function getCitationsFromMessage(message: Message): Map<string, CitationPayload> {
