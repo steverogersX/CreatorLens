@@ -122,6 +122,23 @@ export async function saveMessages(
   );
 }
 
+/**
+ * Drops every chat message past the first `keepCount` (chronological order),
+ * so an edited/regenerated turn can replace everything from that point on.
+ */
+export async function truncateThreadMessages(threadId: string, keepCount: number): Promise<void> {
+  const rows = await db
+    .select({ id: chatMessages.id })
+    .from(chatMessages)
+    .where(eq(chatMessages.threadId, threadId))
+    .orderBy(asc(chatMessages.createdAt));
+
+  const toDelete = rows.slice(keepCount).map((r) => r.id);
+  if (toDelete.length === 0) return;
+
+  await db.delete(chatMessages).where(inArray(chatMessages.id, toDelete));
+}
+
 export async function getThreadData(threadId: string): Promise<ThreadData | null> {
   const threadRows = await db
     .select({ id: threads.id, status: threads.status })
