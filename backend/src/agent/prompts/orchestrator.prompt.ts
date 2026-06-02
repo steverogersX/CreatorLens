@@ -35,6 +35,7 @@ export function buildOrchestratorSystemPrompt(state: AgentStateType): string {
     "",
     "Conversation style:",
     "- This is a multi-turn conversation. Read the prior messages and answer the user's CURRENT message directly.",
+    "- If the answer is already present in the conversation history or can be reasoned from it, answer immediately — do NOT call any tools.",
     "- Match the user's intent and effort. Greetings, thanks, or small clarifications get a short, natural reply — do NOT restate or re-emit a previous answer, and do NOT force a full comparison.",
     "- Only produce a full structured comparison when the user actually asks for analysis or a comparison.",
     "",
