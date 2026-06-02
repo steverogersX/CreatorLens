@@ -29,9 +29,21 @@ export async function getYouTubeMetadata(url: string): Promise<IVideoMeta> {
 }
 
 export async function fetchYouTubeVideoData(url: string): Promise<{ meta: IVideoMeta; transcript: ITranscript }> {
-  const [transcript, meta] = await Promise.all([
-    getYouTubeTranscript(url),
-    getYouTubeMetadata(url),
-  ]);
+  // Single yt-dlp call — `info` carries both the metadata and the caption
+  // tracks. Fetching meta and transcript separately would spawn yt-dlp twice
+  // (the slowest step) and risk YouTube throttling concurrent scrapes.
+  const info = await ytdlp.getInfoAsync<"video">(url);
+
+  const meta = metaAdapter.adapt(info);
+
+  const captions = await fetchCaptionJson3(info);
+  if (!captions) {
+    // TODO: fall back to audio download + Whisper transcription
+    throw new Error("No captions available for this video");
+  }
+
+  const raw: YouTubeJson3 = { ...(JSON.parse(captions.content) as YouTubeJson3), language: captions.lang };
+  const transcript = TranscriptSchema.parse(transcriptAdapter.adapt(raw));
+
   return { meta, transcript };
 }

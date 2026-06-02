@@ -41,16 +41,22 @@ export async function analyzeVideosStreaming(
     urls.map(async (url, i) => {
       const position = i + 1;
       const { hostname } = new URL(url);
+      const label = `Analyzing video ${hostname}`;
 
-      const analysis = await analyzeVideo(url);
+      bus.publish({ type: "agent_step", platform: hostname, label, stepStatus: "running" });
 
-      bus.publish({ type: "video_meta", position, meta: analysis.meta });
-
-      bus.publish({ type: "agent_step", platform: hostname, label: `Analyzing video ${hostname}`, stepStatus: "running" });
-      await persistVideoAnalysis(threadId, position, analysis);
-      bus.publish({ type: "agent_step", platform: hostname, label: `Analyzing video ${hostname}`, stepStatus: "done" });
-
+      // Fetch metadata + transcript first, then push the video card to the UI
+      // immediately — the slower embed + persist runs afterwards.
+      const fetcher = resolveService(url);
+      const { meta, transcript } = await fetcher(url);
+      bus.publish({ type: "video_meta", position, meta });
       bus.publish({ type: "video_ready", position });
+
+      // Chunk + embed + persist — required before the agent can read transcripts.
+      const chunks = await chunkTranscript(transcript, getEmbedder());
+      await persistVideoAnalysis(threadId, position, { meta, transcript, chunks });
+
+      bus.publish({ type: "agent_step", platform: hostname, label, stepStatus: "done" });
     }),
   );
 
