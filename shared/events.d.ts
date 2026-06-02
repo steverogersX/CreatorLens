@@ -21,8 +21,13 @@ export interface VideoMetaPayload {
 
 export interface CitationPayload {
   video: "A" | "B";
+  /** Start of the cited chunk, formatted MM:SS — matches the inline `[A:MM:SS]` marker. */
   timestampLabel: string;
   timestampSecs: number;
+  /** End of the cited chunk, formatted MM:SS — used to render the time range. */
+  endTimestampLabel: string;
+  endSecs: number;
+  /** The transcript text of the cited chunk. */
   snippet: string;
 }
 
