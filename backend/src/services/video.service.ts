@@ -30,6 +30,14 @@ export async function analyzeVideos(urls: string[]): Promise<ThreadResult> {
   return { threadId, analyses };
 }
 
+function platformName(hostname: string): string {
+  if (hostname.includes("youtube") || hostname.includes("youtu.be")) return "YouTube";
+  if (hostname.includes("instagram")) return "Instagram";
+  if (hostname.includes("twitter") || hostname === "x.com") return "X";
+  if (hostname.includes("tiktok")) return "TikTok";
+  return hostname;
+}
+
 export async function analyzeVideosStreaming(
   urls: string[],
   bus: RequestEventBus,
@@ -41,9 +49,9 @@ export async function analyzeVideosStreaming(
     urls.map(async (url, i) => {
       const position = i + 1;
       const { hostname } = new URL(url);
-      const label = `Analyzing video ${hostname}`;
+      const label = `Analyzing ${platformName(hostname)} video`;
 
-      bus.publish({ type: "agent_step", platform: hostname, label, stepStatus: "running" });
+      bus.publish({ type: "agent_step", platform: hostname, tool: null, label, stepStatus: "running" });
 
       // Fetch metadata + transcript first, then push the video card to the UI
       // immediately — the slower embed + persist runs afterwards.
@@ -56,7 +64,7 @@ export async function analyzeVideosStreaming(
       const chunks = await chunkTranscript(transcript, getEmbedder());
       await persistVideoAnalysis(threadId, position, { meta, transcript, chunks });
 
-      bus.publish({ type: "agent_step", platform: hostname, label, stepStatus: "done" });
+      bus.publish({ type: "agent_step", platform: hostname, tool: null, label, stepStatus: "done" });
     }),
   );
 

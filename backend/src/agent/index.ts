@@ -15,9 +15,10 @@ export async function runAgent(threadId: string, userMessage: string): Promise<s
 }
 
 const TOOL_LABELS: Record<string, string> = {
-  read_video_transcript: "Reading video transcript",
+  read_video_transcript: "Reading transcript",
   get_video_meta: "Fetching video metadata",
-  read_thread_video_meta: "Reading thread video metadata",
+  read_thread_video_meta: "Reading thread metadata",
+  search_video_transcript: "Searching transcript",
 };
 
 function toolLabel(name: string): string {
@@ -42,14 +43,16 @@ export async function streamAgent(
     for await (const event of events) {
     if (signal?.aborted) break;
     if (event.event === "on_tool_start") {
-      const label = toolLabel(event.name as string);
-      bus.publish({ type: "agent_step", platform: null, label, stepStatus: "running" });
+      const name = event.name as string;
+      const label = toolLabel(name);
+      bus.publish({ type: "agent_step", platform: null, tool: name, label, stepStatus: "running" });
       continue;
     }
 
     if (event.event === "on_tool_end") {
-      const label = toolLabel(event.name as string);
-      bus.publish({ type: "agent_step", platform: null, label, stepStatus: "done" });
+      const name = event.name as string;
+      const label = toolLabel(name);
+      bus.publish({ type: "agent_step", platform: null, tool: name, label, stepStatus: "done" });
       continue;
     }
 
@@ -65,7 +68,7 @@ export async function streamAgent(
 
     if (content && !hasToolCallChunks) {
       if (!responseStepStarted) {
-        bus.publish({ type: "agent_step", platform: null, label: "Generating response", stepStatus: "running" });
+        bus.publish({ type: "agent_step", platform: null, tool: null, label: "Generating response", stepStatus: "running" });
         responseStepStarted = true;
       }
       fullContent += content;
@@ -77,7 +80,7 @@ export async function streamAgent(
     // instead of throwing so it can be persisted and shown.
     if (signal?.aborted) {
       if (responseStepStarted) {
-        bus.publish({ type: "agent_step", platform: null, label: "Generating response", stepStatus: "done" });
+        bus.publish({ type: "agent_step", platform: null, tool: null, label: "Generating response", stepStatus: "done" });
       }
       log.info({ threadId, partialLength: fullContent.length }, "[streamAgent] stopped by client");
       return fullContent;
@@ -86,7 +89,7 @@ export async function streamAgent(
   }
 
   if (responseStepStarted) {
-    bus.publish({ type: "agent_step", platform: null, label: "Generating response", stepStatus: "done" });
+    bus.publish({ type: "agent_step", platform: null, tool: null, label: "Generating response", stepStatus: "done" });
   }
 
   await resolveCitations(threadId, fullContent, bus);
