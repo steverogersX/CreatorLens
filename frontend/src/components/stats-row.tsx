@@ -22,24 +22,26 @@ interface StatDef {
   iconClass: string;
 }
 
+const ICON_CLASS = "text-muted-foreground";
+
 const PLATFORM_STATS: Record<"youtube" | "instagram" | "twitter", StatDef[]> = {
   youtube: [
-    { key: "views",    Icon: Eye,           label: "Views",    iconClass: "text-[#FF4040]"          },
-    { key: "likes",    Icon: ThumbsUp,      label: "Likes",    iconClass: "text-[#FF4040]"          },
-    { key: "comments", Icon: MessageSquare, label: "Comments", iconClass: "text-muted-foreground/50" },
-    { key: "duration", Icon: Clock,         label: "Duration", iconClass: "text-muted-foreground/50" },
+    { key: "views",    Icon: Eye,           label: "Views",    iconClass: ICON_CLASS },
+    { key: "likes",    Icon: ThumbsUp,      label: "Likes",    iconClass: ICON_CLASS },
+    { key: "comments", Icon: MessageSquare, label: "Comments", iconClass: ICON_CLASS },
+    { key: "duration", Icon: Clock,         label: "Duration", iconClass: ICON_CLASS },
   ],
   instagram: [
-    { key: "likes",    Icon: Heart,         label: "Likes",    iconClass: "text-[#E1306C]"          },
-    { key: "views",    Icon: Eye,           label: "Views",    iconClass: "text-[#C13584]"          },
-    { key: "comments", Icon: MessageSquare, label: "Comments", iconClass: "text-muted-foreground/50" },
-    { key: "duration", Icon: Bookmark,      label: "Saves",    iconClass: "text-muted-foreground/50" },
+    { key: "likes",    Icon: Heart,         label: "Likes",    iconClass: ICON_CLASS },
+    { key: "views",    Icon: Eye,           label: "Views",    iconClass: ICON_CLASS },
+    { key: "comments", Icon: MessageSquare, label: "Comments", iconClass: ICON_CLASS },
+    { key: "duration", Icon: Bookmark,      label: "Saves",    iconClass: ICON_CLASS },
   ],
   twitter: [
-    { key: "views",    Icon: BarChart2,     label: "Impressions", iconClass: "text-[#1D9BF0]"          },
-    { key: "likes",    Icon: Heart,         label: "Likes",       iconClass: "text-[#F91880]"          },
-    { key: "comments", Icon: MessageSquare, label: "Replies",     iconClass: "text-muted-foreground/50" },
-    { key: "duration", Icon: Repeat2,       label: "Retweets",    iconClass: "text-[#00BA7C]"          },
+    { key: "views",    Icon: BarChart2,     label: "Impressions", iconClass: ICON_CLASS },
+    { key: "likes",    Icon: Heart,         label: "Likes",       iconClass: ICON_CLASS },
+    { key: "comments", Icon: MessageSquare, label: "Replies",     iconClass: ICON_CLASS },
+    { key: "duration", Icon: Repeat2,       label: "Retweets",    iconClass: ICON_CLASS },
   ],
 };
 
@@ -53,8 +55,8 @@ export function StatsRow({ views, likes, comments, duration, platform = "youtube
         <div
           key={`${platform}-${key}`}
           className={cn(
-            "flex items-center gap-2.5 rounded-xl px-3 py-2.5",
-            "bg-muted/30 border border-border/40",
+            "flex items-center gap-2.5 rounded-xl px-3 py-2.5 min-w-0",
+            "bg-secondary border border-border",
           )}
         >
           <div className="shrink-0">

@@ -23,124 +23,133 @@
   --color-accent:               var(--accent);
   --color-accent-foreground:    var(--accent-foreground);
   --color-destructive:          var(--destructive);
+  --color-success:              var(--success);
   --color-border:               var(--border);
   --color-input:                var(--input);
   --color-ring:                 var(--ring);
   --color-sidebar:              var(--sidebar);
   --color-sidebar-foreground:   var(--sidebar-foreground);
   --color-sidebar-border:       var(--sidebar-border);
+  --color-sidebar-accent:       var(--sidebar-accent);
 
-  /* ── Functional accent tokens (Video A/B) ─────────── */
-  --color-accent-blue:          var(--accent-blue);
-  --color-accent-green:         var(--accent-green);
+  /* ── Video A/B accents — two tones of the monochrome scale ── */
+  --color-video-a:              var(--video-a);
+  --color-video-a-foreground:   var(--video-a-foreground);
+  --color-video-b:              var(--video-b);
+  --color-video-b-foreground:   var(--video-b-foreground);
 
-  /* ── app-* aliases (referenced by components) ─────── */
+  /* ── app-* aliases kept for existing references ───── */
   --color-app-bg:               var(--background);
   --color-app-surface:          var(--card);
   --color-app-surface-2:        var(--secondary);
   --color-app-border:           var(--border);
   --color-app-text:             var(--foreground);
   --color-app-text-2:           var(--muted-foreground);
-  --color-app-muted:            var(--muted-foreground);
-  --color-app-primary:          var(--primary);
-  --color-app-primary-hover:    var(--primary-container);
-  --color-app-blue:             var(--accent-blue);
-  --color-app-green:            var(--accent-green);
 
   /* ── Radius scale ─────────────────────────────────── */
-  --radius-sm:  0.125rem;  /* 2px  — tags, checkboxes  */
-  --radius-md:  0.375rem;  /* 6px  — standard elements */
-  --radius-lg:  0.5rem;    /* 8px  — containers        */
-  --radius-xl:  0.75rem;   /* 12px                     */
-  --radius-2xl: 1rem;      /* 16px — message bubbles   */
-  --radius-3xl: 1.25rem;   /* 20px                     */
+  --radius-sm:  0.375rem;  /* 6px  */
+  --radius-md:  0.5rem;    /* 8px  */
+  --radius-lg:  0.625rem;  /* 10px */
+  --radius-xl:  0.875rem;  /* 14px */
+  --radius-2xl: 1.125rem;  /* 18px — message bubbles */
+  --radius-3xl: 1.5rem;    /* 24px */
 }
 
-/* ── Obsidian Technical System — Dark First ─────────────── */
-:root {
-  --radius: 0.375rem;
+/* ───────────────────────────────────────────────────────────
+   Monochrome · Warm Stone — minimal SaaS, dark-first
+   A = bright tone · B = muted tone (no chromatic accents)
+   ─────────────────────────────────────────────────────────── */
+:root,
+.dark {
+  --radius: 0.625rem;
 
-  /* Surfaces */
-  --background:   #141313;
-  --foreground:   #e5e2e1;
+  /* Surfaces — warm near-black stone */
+  --background:           #0c0a09;
+  --foreground:           #fafaf9;
 
-  --card:         #1c1b1b;
-  --card-foreground: #e5e2e1;
+  --card:                 #141211;
+  --card-foreground:      #fafaf9;
 
-  --popover:      #222222;
-  --popover-foreground: #e5e2e1;
+  --popover:              #1a1715;
+  --popover-foreground:   #fafaf9;
 
-  /* Primary — high-contrast white */
-  --primary:           #ffffff;
-  --primary-foreground: #2f3131;
-  --primary-container:  #e2e2e2;
+  /* Primary — warm off-white */
+  --primary:              #fafaf9;
+  --primary-foreground:   #1c1917;
 
-  /* Secondary surface */
-  --secondary:          #2a2a2a;
-  --secondary-foreground: #e5e2e1;
+  /* Secondary / elevated surfaces */
+  --secondary:            #1c1917;
+  --secondary-foreground: #e7e5e4;
 
   /* Muted / dim */
-  --muted:          #201f1f;
-  --muted-foreground: #c4c7c8;
+  --muted:                #16130f;
+  --muted-foreground:     #8c857d;
 
-  /* Accent surface */
-  --accent:         #353434;
-  --accent-foreground: #e5e2e1;
+  /* Accent surface (hover / active) */
+  --accent:               #292524;
+  --accent-foreground:    #fafaf9;
 
-  /* Error */
-  --destructive:    #ffb4ab;
+  /* Status */
+  --destructive:          #f5a097;
+  --success:              #86d9a4;
 
-  /* Strokes */
-  --border:  #444748;
-  --input:   #1c1b1b;
-  --ring:    #8e9192;
+  /* Strokes / fields */
+  --border:               #262220;
+  --input:                #1c1917;
+  --ring:                 #57534e;
 
   /* Sidebar */
-  --sidebar:          #1c1b1b;
-  --sidebar-foreground: #e5e2e1;
-  --sidebar-border:   #444748;
+  --sidebar:              #0a0807;
+  --sidebar-foreground:   #fafaf9;
+  --sidebar-border:       #211e1c;
+  --sidebar-accent:       #1c1917;
 
-  /* Functional accents — Video A/B comparison */
-  --accent-blue:  #5b8def;
-  --accent-green: #4cba7a;
+  /* Video A (bright) / Video B (muted) */
+  --video-a:              #fafaf9;
+  --video-a-foreground:   #1c1917;
+  --video-b:              #a8a29e;
+  --video-b-foreground:   #1c1917;
 }
 
-/* Dark mode mirrors root — design system is dark-first */
-.dark {
-  --background:   #141313;
-  --foreground:   #e5e2e1;
+.light {
+  /* Surfaces — bright warm paper */
+  --background:           #ffffff;
+  --foreground:           #1c1917;
 
-  --card:         #1c1b1b;
-  --card-foreground: #e5e2e1;
+  --card:                 #ffffff;
+  --card-foreground:      #1c1917;
 
-  --popover:      #222222;
-  --popover-foreground: #e5e2e1;
+  --popover:              #ffffff;
+  --popover-foreground:   #1c1917;
 
-  --primary:           #ffffff;
-  --primary-foreground: #2f3131;
-  --primary-container:  #e2e2e2;
+  --primary:              #1c1917;
+  --primary-foreground:   #fafaf9;
 
-  --secondary:          #2a2a2a;
-  --secondary-foreground: #e5e2e1;
+  --secondary:            #f5f5f4;
+  --secondary-foreground: #1c1917;
 
-  --muted:          #201f1f;
-  --muted-foreground: #c4c7c8;
+  --muted:                #fafaf9;
+  --muted-foreground:     #79716b;
 
-  --accent:         #353434;
-  --accent-foreground: #e5e2e1;
+  --accent:               #e7e5e4;
+  --accent-foreground:    #1c1917;
 
-  --destructive:    #ffb4ab;
+  --destructive:          #b42318;
+  --success:              #067647;
 
-  --border:  #444748;
-  --input:   #1c1b1b;
-  --ring:    #8e9192;
+  --border:               #e7e5e4;
+  --input:                #f5f5f4;
+  --ring:                 #a8a29e;
 
-  --sidebar:          #1c1b1b;
-  --sidebar-foreground: #e5e2e1;
-  --sidebar-border:   #444748;
+  --sidebar:              #fafaf9;
+  --sidebar-foreground:   #1c1917;
+  --sidebar-border:       #ececeb;
+  --sidebar-accent:       #f0efee;
 
-  --accent-blue:  #5b8def;
-  --accent-green: #4cba7a;
+  --video-a:              #1c1917;
+  --video-a-foreground:   #fafaf9;
+  --video-b:              #79716b;
+  --video-b-foreground:   #fafaf9;
 }
 
 @layer base {
@@ -149,36 +158,51 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "cv11", "ss01";
+    text-rendering: optimizeLegibility;
+  }
+  /* Tighter, more modern selection */
+  ::selection {
+    background: color-mix(in oklch, var(--foreground) 18%, transparent);
   }
 }
 
 /* ── Markdown ─────────────────────────────────────────── */
 @layer components {
   .markdown {
-    @apply text-sm leading-7 text-foreground;
+    @apply text-[14px] leading-[1.7] text-foreground/90;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
-  .markdown > * + * { @apply mt-4; }
-  .markdown :is(h1,h2,h3,h4) { @apply scroll-m-20 font-semibold tracking-tight; }
-  .markdown h1 { @apply mt-8 text-2xl; }
-  .markdown h2 { @apply mt-7 text-xl; }
-  .markdown h3 { @apply mt-6 text-lg; }
-  .markdown p  { @apply text-foreground/95; }
+  .markdown > * + * { @apply mt-3.5; }
+  .markdown :is(h1,h2,h3,h4) { @apply scroll-m-20 font-semibold tracking-tight text-foreground; }
+  .markdown h1 { @apply mt-6 text-[17px]; }
+  .markdown h2 { @apply mt-5 text-[15px]; }
+  .markdown h3 { @apply mt-4 text-[13px] uppercase tracking-wider text-muted-foreground; }
+  .markdown p  { @apply text-foreground/90; }
   .markdown strong { @apply font-semibold text-foreground; }
-  .markdown em     { @apply italic text-foreground/90; }
-  .markdown ul { @apply my-3 ml-6 list-disc space-y-2; }
-  .markdown ol { @apply my-3 ml-6 list-decimal space-y-2; }
-  .markdown li::marker { @apply text-muted-foreground; }
-  .markdown blockquote { @apply my-5 border-l-2 border-border pl-4 italic text-muted-foreground; }
-  .markdown hr { @apply my-6 border-border; }
+  .markdown em     { @apply italic text-foreground/80; }
+  .markdown a { @apply font-medium text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground transition-colors; }
+  .markdown ul { @apply my-3 ml-5 list-disc space-y-1.5 marker:text-muted-foreground/60; }
+  .markdown ol { @apply my-3 ml-5 list-decimal space-y-1.5 marker:text-muted-foreground/60; }
+  .markdown blockquote { @apply my-4 border-l-2 border-border pl-4 italic text-muted-foreground; }
+  .markdown hr { @apply my-5 border-border; }
   .markdown :not(pre) > code {
-    @apply rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.8125rem] text-foreground;
+    @apply rounded-md border border-border bg-secondary px-1.5 py-0.5 font-mono text-[0.8125rem] text-foreground;
   }
   .markdown pre {
-    @apply my-5 overflow-x-auto rounded-lg border border-border bg-secondary px-4 py-3 text-[0.8125rem] leading-6;
+    @apply my-4 max-w-full overflow-x-auto rounded-xl border border-border bg-secondary px-4 py-3 text-[0.8125rem] leading-6;
   }
   .markdown pre code {
     @apply block min-w-max bg-transparent p-0 font-mono text-[0.8125rem] text-foreground;
   }
+  /* Tables must never blow out the chat column */
+  .markdown table {
+    @apply my-4 block w-full max-w-full overflow-x-auto border-collapse text-[13px];
+  }
+  .markdown thead { @apply border-b border-border text-left text-muted-foreground; }
+  .markdown th { @apply px-3 py-2 font-medium whitespace-nowrap; }
+  .markdown td { @apply border-b border-border/60 px-3 py-2 align-top; }
 }
 
 /* ── Utilities ────────────────────────────────────────── */
@@ -186,16 +210,21 @@
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-  .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+  .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
   .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: #444748;
+    background-color: color-mix(in oklch, var(--foreground) 14%, transparent);
     border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: #8e9192;
+    background-color: color-mix(in oklch, var(--foreground) 26%, transparent);
   }
-  .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #444748 transparent; }
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--foreground) 14%, transparent) transparent;
+  }
 }
 
 /* ── Streaming cursor ─────────────────────────────────── */
@@ -204,11 +233,16 @@
   50%       { opacity: 0; }
 }
 .cursor-blink::after {
-  content: "▋";
+  content: "";
   display: inline-block;
-  color: var(--muted-foreground);
-  animation: blink 1s step-end infinite;
-  margin-left: 1px;
+  width: 0.5em;
+  height: 1em;
+  vertical-align: text-bottom;
+  background: currentColor;
+  opacity: 0.7;
+  border-radius: 1px;
+  animation: blink 1.05s step-end infinite;
+  margin-left: 2px;
 }
 
 /* ── Skeleton shimmer ─────────────────────────────────── */
@@ -217,12 +251,12 @@
   100% { background-position:  400px 0; }
 }
 .skeleton {
-  background: linear-gradient(90deg, var(--border) 25%, var(--muted) 50%, var(--border) 75%);
+  background: linear-gradient(90deg, var(--border) 25%, var(--accent) 50%, var(--border) 75%);
   background-size: 400px 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }
 
-/* ── Thinking shimmer ─────────────────────────────────── */
+/* ── Thinking shimmer — monochrome ────────────────────── */
 @keyframes thinkingShimmer {
   0%   { background-position:  150% 0; }
   100% { background-position: -150% 0; }
@@ -230,12 +264,12 @@
 .thinking-shimmer {
   background: linear-gradient(
     90deg,
-    oklch(1 0 0 / 0.3),
-    oklch(1 0 0 / 1),
-    oklch(1 0 0 / 0.3)
+    color-mix(in oklch, var(--foreground) 30%, transparent),
+    var(--foreground),
+    color-mix(in oklch, var(--foreground) 30%, transparent)
   );
   background-size: 200% 100%;
-  animation: thinkingShimmer 2.5s linear infinite;
+  animation: thinkingShimmer 2.4s linear infinite;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

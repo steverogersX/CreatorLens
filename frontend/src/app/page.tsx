@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Aperture, ArrowUp, X, Loader2 } from "lucide-react";
 import { initStream, pushStreamEvent, type LiveEvent } from "@/lib/active-stream";
@@ -61,10 +61,11 @@ const PLATFORM_ICON: Record<Platform, React.FC<{ className?: string }>> = {
   twitter: XIcon,
 };
 
+// Monochrome — platform recognition comes from the glyph shape, not colour.
 const PLATFORM_COLOR: Record<Platform, string> = {
-  youtube: "text-[#FF4444]",
-  instagram: "text-[#E1306C]",
-  twitter: "text-[#1DA1F2]",
+  youtube: "text-foreground/70",
+  instagram: "text-foreground/70",
+  twitter: "text-foreground/70",
 };
 
 /* ── Toast ─────────────────────────────────────────────────── */
@@ -106,9 +107,8 @@ function UrlChip({
 
   return (
     <div className={cn(
-      "flex items-center gap-2 pr-1 pl-1 h-9 rounded-xl border shrink-0",
-      "bg-secondary/60 transition-all duration-150",
-      isA ? "border-accent-blue/25" : "border-accent-green/25"
+      "flex items-center gap-2 pr-1.5 pl-1.5 h-10 rounded-xl border border-border shrink-0",
+      "bg-secondary transition-colors duration-150",
     )}>
       {/* Thumbnail or icon */}
       {ytId ? (
@@ -119,10 +119,7 @@ function UrlChip({
           className="w-12 h-[28px] rounded-lg object-cover shrink-0 bg-border/40"
         />
       ) : (
-        <div className={cn(
-          "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
-          isA ? "bg-accent-blue/10" : "bg-accent-green/10"
-        )}>
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-accent">
           <Icon className={cn("w-3.5 h-3.5", iconColor)} />
         </div>
       )}
@@ -131,7 +128,7 @@ function UrlChip({
       <div className="flex flex-col leading-none gap-0.5 min-w-0">
         <span className={cn(
           "text-[10px] font-bold font-mono tracking-widest",
-          isA ? "text-accent-blue" : "text-accent-green"
+          isA ? "text-foreground" : "text-muted-foreground"
         )}>
           VIDEO {label}
         </span>
@@ -168,16 +165,17 @@ export default function Home() {
   const [question, setQuestion] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isMock, setIsMock] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Resolve mock flag client-side only to avoid SSR hydration mismatch
-  useEffect(() => {
-    setIsMock(
+  // Mock flag is client-only (env + URL). useSyncExternalStore returns false
+  // during SSR and the real value on the client — no hydration mismatch.
+  const isMock = useSyncExternalStore(
+    () => () => {},
+    () =>
       process.env["NEXT_PUBLIC_MOCK_STREAM"] === "1" ||
-        new URLSearchParams(window.location.search).has("mock"),
-    );
-  }, []);
+      new URLSearchParams(window.location.search).has("mock"),
+    () => false,
+  );
 
   const canSubmit = (videoUrls.length === 2 || isMock) && !isSubmitting;
 
@@ -253,8 +251,6 @@ export default function Home() {
     if (isMock) {
       setIsSubmitting(true);
       const tid = playMockStream(MOCK_THREAD_ID);
-      const urlA = videoUrls[0] ?? "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
-      const urlB = videoUrls[1] ?? "https://www.youtube.com/watch?v=Tn6-PIqc4UM";
       setTimeout(() => {
         setIsSubmitting(false);
         router.push(`/c/${tid}`);
@@ -308,7 +304,7 @@ export default function Home() {
 
             if (event["type"] === "thread_created" && !navigated) {
               threadId = event["threadId"] as string;
-              initStream(threadId);
+              initStream(threadId, userMessage);
               navigated = true;
               setIsSubmitting(false);
               router.push(`/c/${threadId}`);
@@ -351,37 +347,30 @@ export default function Home() {
       : "Ask anything, or just hit enter to compare…";
 
   return (
-    <div className="h-full flex flex-col items-center justify-center bg-background px-4">
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 mb-10">
-        <div className="w-9 h-9 rounded-lg bg-foreground flex items-center justify-center shrink-0">
-          <Aperture size={17} className="text-background" strokeWidth={2} />
+    <div className="h-full flex flex-col items-center justify-center bg-background px-4 overflow-y-auto custom-scrollbar">
+      <div className="flex flex-col items-center w-full max-w-[640px] py-10">
+        <div className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-foreground shadow-sm">
+          <Aperture size={22} className="text-background" strokeWidth={2} />
         </div>
-        <span className="text-[18px] font-semibold tracking-tight text-foreground">
-          CreatorLens
-        </span>
-      </div>
 
-      {isMock && (
-        <div className="mb-4 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-[11px] font-mono text-amber-400/80 tracking-widest">
-          MOCK MODE
-        </div>
-      )}
-      <h1 className="text-[26px] font-semibold tracking-tight text-foreground text-center mb-1">
-        Compare any two videos with AI
-      </h1>
-      <p className="text-[14px] text-muted-foreground text-center mb-8">
-        Paste two video URLs — add a question or just hit enter
-      </p>
+        {isMock && (
+          <div className="mb-4 px-2.5 py-1 rounded-full bg-secondary border border-border text-[11px] font-mono text-muted-foreground tracking-widest">
+            MOCK MODE
+          </div>
+        )}
+        <h1 className="text-[30px] leading-tight font-semibold tracking-tight text-foreground text-center mb-2">
+          Compare any two videos with AI
+        </h1>
+        <p className="text-[14.5px] text-muted-foreground text-center mb-8">
+          Paste two video URLs — add a question, or just hit enter to compare.
+        </p>
 
       {/* Input card */}
-      <div className="w-full max-w-[600px]">
+      <div className="w-full">
         <div className={cn(
-          "flex flex-col bg-card border rounded-2xl px-4 py-3.5",
-          "transition-all duration-150",
-          canSubmit
-            ? "border-border focus-within:border-foreground/25"
-            : "border-border/60 focus-within:border-border"
+          "flex flex-col bg-card border rounded-2xl px-4 py-4 shadow-sm",
+          "transition-colors duration-150 border-border",
+          "focus-within:border-foreground/30 focus-within:ring-4 focus-within:ring-foreground/5",
         )}>
           {/* URL chips row */}
           {videoUrls.length > 0 && (
@@ -450,6 +439,7 @@ export default function Home() {
             </button>
           ))}
         </div>
+      </div>
       </div>
 
       {/* Toast */}

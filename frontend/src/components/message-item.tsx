@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useMemo, memo, useDeferredValue } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
+import { useState, useMemo, memo } from "react";
+import type { Components } from "react-markdown";
 import { Copy, ThumbsUp, ThumbsDown, RotateCcw, Pencil, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Markdown } from "@/components/markdown";
 import { CitationBadge } from "@/components/citation-badge";
 import { AgentSteps, type AgentStep } from "@/components/agent-steps";
+import { useThrottledValue } from "@/lib/use-throttled-value";
 import type { UIMessage, TextUIPart } from "ai";
+import type { CitationPayload } from "@shared/events";
+
+// Cap full Markdown re-parses to ~12/s while a message streams token-by-token.
+const STREAM_THROTTLE_MS = 80;
 
 export type Message = UIMessage;
 
@@ -43,11 +46,27 @@ function getStepsFromMessage(message: Message): AgentStep[] {
   return order.map((label) => ({ label, stepStatus: map.get(label)! }));
 }
 
-const CITE_RE = /\[([AB]):([^\]]+)\]/g;
+function getSnippetsFromMessage(message: Message): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const part of message.parts) {
+    if (part.type === "data-citations") {
+      const { citations } = (
+        part as unknown as { type: string; data: { citations: CitationPayload[] } }
+      ).data;
+      for (const c of citations) {
+        map.set(`${c.video}:${c.timestampLabel}`, c.snippet);
+      }
+    }
+  }
+  return map;
+}
+
+const CITE_RE = /\[([AB]):(\d+:\d+)\]/g;
 
 function splitOnCitations(
   text: string,
-  platforms: Record<"A" | "B", VideoPlatform>
+  platforms: Record<"A" | "B", VideoPlatform>,
+  snippets: Map<string, string>,
 ): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
   let cursor = 0;
@@ -57,12 +76,15 @@ function splitOnCitations(
   while ((m = re.exec(text)) !== null) {
     if (m.index > cursor) nodes.push(text.slice(cursor, m.index));
     const video = m[1] as "A" | "B";
+    const timestamp = m[2]!;
+    const snippet = snippets.get(`${video}:${timestamp}`);
     nodes.push(
       <CitationBadge
         key={`${video}-${m.index}`}
         video={video}
-        timestamp={m[2]}
+        timestamp={timestamp}
         platform={platforms[video]}
+        snippet={snippet}
       />
     );
     cursor = m.index + m[0].length;
@@ -73,28 +95,30 @@ function splitOnCitations(
 
 function parseChildren(
   children: React.ReactNode,
-  platforms: Record<"A" | "B", VideoPlatform>
+  platforms: Record<"A" | "B", VideoPlatform>,
+  snippets: Map<string, string>,
 ): React.ReactNode {
-  if (typeof children === "string") return splitOnCitations(children, platforms);
+  if (typeof children === "string") return splitOnCitations(children, platforms, snippets);
   if (Array.isArray(children)) {
     return children.flatMap((child) =>
-      typeof child === "string" ? splitOnCitations(child, platforms) : [child]
+      typeof child === "string" ? splitOnCitations(child, platforms, snippets) : [child]
     );
   }
   return children;
 }
 
-function makeMdComponents(
-  platforms: Record<"A" | "B", VideoPlatform>
-): React.ComponentProps<typeof ReactMarkdown>["components"] {
+export function makeMdComponents(
+  platforms: Record<"A" | "B", VideoPlatform>,
+  snippets: Map<string, string>,
+): Components {
   return {
     p: ({ children }) => (
       <p className="text-[14px] leading-[1.75] text-foreground/90 mb-3 last:mb-0">
-        {parseChildren(children, platforms)}
+        {parseChildren(children, platforms, snippets)}
       </p>
     ),
     li: ({ children }) => (
-      <li className="leading-[1.75]">{parseChildren(children, platforms)}</li>
+      <li className="leading-[1.75]">{parseChildren(children, platforms, snippets)}</li>
     ),
     strong: ({ children }) => (
       <strong className="font-semibold text-foreground">{children}</strong>
@@ -104,7 +128,7 @@ function makeMdComponents(
     ),
     a: ({ href, children }) => (
       <a href={href} target="_blank" rel="noopener noreferrer"
-        className="text-accent-blue underline underline-offset-2 hover:text-accent-blue/80 transition-colors">
+        className="font-medium text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground transition-colors break-words">
         {children}
       </a>
     ),
@@ -121,7 +145,7 @@ function makeMdComponents(
     code: ({ children, className }) => {
       if (className?.startsWith("language-")) return <code className={className}>{children}</code>;
       return (
-        <code className="bg-secondary text-accent-blue font-mono text-[12px] px-1.5 py-0.5 rounded border border-border/50">
+        <code className="bg-secondary text-foreground font-mono text-[12px] px-1.5 py-0.5 rounded border border-border break-words">
           {children}
         </code>
       );
@@ -144,6 +168,8 @@ function makeMdComponents(
   };
 }
 
+const EMPTY_SNIPPETS = new Map<string, string>();
+
 function ActionBtn({
   icon: Icon,
   label,
@@ -162,8 +188,8 @@ function ActionBtn({
       className={cn(
         "w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-150",
         active
-          ? "text-accent-green"
-          : "text-muted-foreground/35 hover:text-muted-foreground hover:bg-secondary/80"
+          ? "text-foreground bg-secondary"
+          : "text-muted-foreground/40 hover:text-foreground hover:bg-secondary/80"
       )}
     >
       <Icon size={13} strokeWidth={1.75} />
@@ -174,13 +200,17 @@ function ActionBtn({
 function MessageItemInner({ message, videoPlatforms, streaming = false }: MessageItemProps) {
   const isUser = message.role === "user";
   const textContent = useMemo(() => getTextContent(message), [message]);
-  const deferredText = useDeferredValue(textContent);
+  const throttledText = useThrottledValue(textContent, streaming ? STREAM_THROTTLE_MS : 0);
   const steps = useMemo(() => getStepsFromMessage(message), [message]);
+  const snippetsMap = useMemo(() => getSnippetsFromMessage(message), [message]);
   const [copied, setCopied] = useState(false);
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
 
-  const mdComponents = useMemo(() => makeMdComponents(videoPlatforms), [videoPlatforms]);
+  const mdComponents = useMemo(
+    () => makeMdComponents(videoPlatforms, snippetsMap),
+    [videoPlatforms, snippetsMap],
+  );
 
   function handleCopy() {
     navigator.clipboard.writeText(textContent);
@@ -192,11 +222,12 @@ function MessageItemInner({ message, videoPlatforms, streaming = false }: Messag
 
   if (isUser) {
     return (
-      <div className="group/msg flex flex-col items-end gap-1.5">
+      <div className="group/msg flex flex-col items-end gap-1.5 min-w-0">
         <div className={cn(
-          "max-w-[75%] bg-secondary border border-border/40",
-          "rounded-3xl rounded-tr-lg px-5 py-3",
-          "text-[14px] leading-[1.75] text-foreground"
+          "max-w-[80%] bg-secondary border border-border",
+          "rounded-2xl rounded-tr-md px-4 py-2.5",
+          "text-[14px] leading-[1.6] text-foreground",
+          "whitespace-pre-wrap break-words",
         )}>
           {textContent}
         </div>
@@ -210,18 +241,12 @@ function MessageItemInner({ message, videoPlatforms, streaming = false }: Messag
   }
 
   return (
-    <div className="group/msg flex flex-col gap-2">
+    <div className="group/msg flex flex-col gap-2 min-w-0">
       <AgentSteps steps={steps} hasText={textContent.length > 0} />
 
       {textContent && (
-        <div className={cn("markdown", streaming && "cursor-blink")}>
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkMath]}
-            rehypePlugins={[rehypeKatex]}
-            components={mdComponents}
-          >
-            {deferredText}
-          </ReactMarkdown>
+        <div className={cn("markdown min-w-0 max-w-full", streaming && "cursor-blink")}>
+          <Markdown text={throttledText} components={mdComponents} />
         </div>
       )}
 
@@ -245,4 +270,5 @@ function MessageItemInner({ message, videoPlatforms, streaming = false }: Messag
   );
 }
 
+export { EMPTY_SNIPPETS };
 export const MessageItem = memo(MessageItemInner);

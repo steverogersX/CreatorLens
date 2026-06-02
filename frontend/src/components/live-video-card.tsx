@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { VideoCard, type VideoData, type Platform } from "@/components/video-card";
+import { VideoCard, type VideoData, type Platform, type VideoAccent } from "@/components/video-card";
 import { subscribeStream, type LiveVideoMeta } from "@/lib/active-stream";
 
 interface LiveVideoCardProps {
@@ -10,7 +10,7 @@ interface LiveVideoCardProps {
   initial: VideoData;
 }
 
-function metaToVideoData(meta: LiveVideoMeta, label: "A" | "B", accent: "blue" | "green"): VideoData {
+function metaToVideoData(meta: LiveVideoMeta, label: "A" | "B", accent: VideoAccent): VideoData {
   const platform: Platform =
     meta.provider === "youtube"   ? "youtube"   :
     meta.provider === "instagram" ? "instagram" : "twitter";
@@ -45,7 +45,7 @@ export function LiveVideoCard({ threadId, position, initial }: LiveVideoCardProp
     const unsub = subscribeStream(threadId, (event) => {
       if (event.type === "video_meta" && event.position === position) {
         const label = position === 1 ? "A" : "B";
-        const accent = position === 1 ? "blue" : "green";
+        const accent: VideoAccent = position === 1 ? "a" : "b";
         setVideo(metaToVideoData(event.meta, label, accent));
       }
     });
