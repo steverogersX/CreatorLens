@@ -3,7 +3,9 @@ import type { IVideoMeta, VideoCreator } from "@/types/video-meta";
 import { VideoMetaAdapter } from "./base";
 
 export class YtDlpVideoMetaAdapter extends VideoMetaAdapter<VideoInfo> {
-  readonly provider = "youtube";
+  constructor(readonly provider: string = "youtube") {
+    super();
+  }
 
   adapt(raw: VideoInfo): IVideoMeta {
     return {
@@ -12,12 +14,14 @@ export class YtDlpVideoMetaAdapter extends VideoMetaAdapter<VideoInfo> {
       title: raw.title,
       description: raw.description || undefined,
       url: raw.webpage_url,
+      thumbnailUrl: raw.thumbnail || undefined,
       views: raw.view_count ?? 0,
       likes: raw.like_count ?? 0,
       commentCount: raw.comment_count ?? 0,
+      retweets: (raw as unknown as { repost_count?: number }).repost_count ?? undefined,
       creator: this.adaptCreator(raw),
       hashtags: this.adaptHashtags(raw.tags ?? []),
-      uploadDate: this.parseUploadDate(raw.upload_date),
+      uploadDate: raw.upload_date ? this.parseUploadDate(raw.upload_date) : new Date(0),
       duration: raw.duration ?? 0,
       fetchedAt: this.timestamp(),
     };
