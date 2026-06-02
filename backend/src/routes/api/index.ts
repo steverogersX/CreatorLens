@@ -1,8 +1,10 @@
 import { Router } from "express";
-import { analyzeVideos } from "@/controllers/video.controller";
+import { chatStream, getThread, getThreads } from "@/controllers/video.controller";
 
 const router = Router();
 
-router.post("/chat", analyzeVideos);
+router.post("/chat", chatStream);
+router.get("/threads", getThreads);
+router.get("/thread/:threadId", getThread);
 
 export default router;

@@ -3,7 +3,8 @@ import type { ITranscript } from "@/types/transcript";
 import { chunkTranscript, type TranscriptChunk } from "@/utils/chunker";
 import { resolveService } from "@/utils/platform";
 import { getEmbedder } from "@/embeddings";
-import { persistThread } from "@/db/persist";
+import { createThread, persistThread, persistVideoAnalysis } from "@/db/persist";
+import type { RequestEventBus } from "@/lib/event-bus";
 
 export interface VideoAnalysis {
   meta: IVideoMeta;
@@ -27,4 +28,37 @@ export async function analyzeVideos(urls: string[]): Promise<ThreadResult> {
   const analyses = await Promise.all(urls.map(analyzeVideo));
   const threadId = await persistThread(analyses);
   return { threadId, analyses };
+}
+
+export async function analyzeVideosStreaming(
+  urls: string[],
+  bus: RequestEventBus,
+): Promise<string> {
+  const threadId = await createThread();
+  bus.publish({ type: "thread_created", threadId });
+
+  await Promise.all(
+    urls.map(async (url, i) => {
+      const position = i + 1;
+      const { hostname } = new URL(url);
+      const label = `Analyzing video ${hostname}`;
+
+      bus.publish({ type: "agent_step", platform: hostname, label, stepStatus: "running" });
+
+      // Fetch metadata + transcript first, then push the video card to the UI
+      // immediately — the slower embed + persist runs afterwards.
+      const fetcher = resolveService(url);
+      const { meta, transcript } = await fetcher(url);
+      bus.publish({ type: "video_meta", position, meta });
+      bus.publish({ type: "video_ready", position });
+
+      // Chunk + embed + persist — required before the agent can read transcripts.
+      const chunks = await chunkTranscript(transcript, getEmbedder());
+      await persistVideoAnalysis(threadId, position, { meta, transcript, chunks });
+
+      bus.publish({ type: "agent_step", platform: hostname, label, stepStatus: "done" });
+    }),
+  );
+
+  return threadId;
 }

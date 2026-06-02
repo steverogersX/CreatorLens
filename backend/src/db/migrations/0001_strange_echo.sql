@@ -1,0 +1,1 @@
+ALTER TABLE "threads" ADD COLUMN "status" text DEFAULT 'streaming' NOT NULL;

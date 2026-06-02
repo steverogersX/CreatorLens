@@ -1,71 +1,41 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { ChatOpenAI } from "@langchain/openai";
-import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatMistralAI } from "@langchain/mistralai";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import { config } from "@/config";
+import { logger } from "@/lib/logger";
 
-const DEFAULTS: Record<string, string> = {
+const log = logger.child({ module: "model" });
+
+const MODEL_NAMES = {
   gemini: "gemini-2.0-flash",
-  openai: "gpt-4o",
-  anthropic: "claude-3-5-sonnet-20241022",
-  deepseek: "deepseek-chat",
   mistral: "mistral-large-latest",
 };
 
-function requireKey(provider: string, key: string | undefined): string {
-  if (!key) {
-    throw new Error(`${provider.toUpperCase()}_API_KEY is required when LLM_PROVIDER=${provider}`);
-  }
-  return key;
+function createGeminiModel() {
+  return new ChatGoogleGenerativeAI({
+    model: MODEL_NAMES.gemini,
+    apiKey: config.GEMINI_API_KEY,
+    maxRetries: 0,
+  });
 }
 
-function createBaseModel() {
-  const provider = config.LLM_PROVIDER;
-  const model = config.LLM_MODEL ?? DEFAULTS[provider];
-
-  switch (provider) {
-    case "gemini":
-      return new ChatGoogleGenerativeAI({
-        model,
-        apiKey: config.GEMINI_API_KEY,
-        maxRetries: 0,
-      });
-
-    case "openai":
-      return new ChatOpenAI({
-        model,
-        apiKey: requireKey("openai", config.OPENAI_API_KEY),
-        maxRetries: 0,
-      });
-
-    case "anthropic":
-      return new ChatAnthropic({
-        model,
-        apiKey: requireKey("anthropic", config.ANTHROPIC_API_KEY),
-        maxRetries: 0,
-      });
-
-    case "deepseek":
-      return new ChatOpenAI({
-        model,
-        apiKey: requireKey("deepseek", config.DEEPSEEK_API_KEY),
-        configuration: { baseURL: "https://api.deepseek.com/v1" },
-        maxRetries: 0,
-      });
-
-    case "mistral":
-      return new ChatMistralAI({
-        model,
-        apiKey: requireKey("mistral", config.MISTRAL_API_KEY),
-        maxRetries: 0,
-      });
-
-    default:
-      throw new Error(`Unsupported LLM provider: ${provider}`);
-  }
+function createMistralModel() {
+  return new ChatMistralAI({
+    model: MODEL_NAMES.mistral,
+    apiKey: config.MISTRAL_API_KEY!,
+    maxRetries: 0,
+  });
 }
 
 export function createModel(tools: StructuredToolInterface[]) {
-  return createBaseModel().bindTools(tools);
+  const primary = createGeminiModel().bindTools(tools);
+
+  if (!config.MISTRAL_API_KEY) {
+    log.warn("[model] MISTRAL_API_KEY not set — running without fallback model");
+    return primary;
+  }
+
+  const secondary = createMistralModel().bindTools(tools);
+  log.info("[model] gemini (primary) → mistral (secondary) fallback enabled");
+  return primary.withFallbacks([secondary]);
 }
