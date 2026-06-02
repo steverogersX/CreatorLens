@@ -1,4 +1,5 @@
 import { graph, graphConfig } from "./graph";
+import { resolveCitations } from "./citations";
 import type { RequestEventBus } from "@/lib/event-bus";
 
 export async function runAgent(threadId: string, userMessage: string): Promise<string> {
@@ -31,8 +32,20 @@ export async function streamAgent(
   );
 
   let fullContent = "";
+  let responseStepStarted = false;
 
   for await (const event of events) {
+    if (event.event === "on_tool_start") {
+      const label = toolLabel(event.name as string);
+      bus.publish({ type: "agent_step", platform: null, label, stepStatus: "running" });
+      continue;
+    }
+
+    if (event.event === "on_tool_end") {
+      const label = toolLabel(event.name as string);
+      bus.publish({ type: "agent_step", platform: null, label, stepStatus: "done" });
+      continue;
+    }
 
     if (event.event !== "on_chat_model_stream") continue;
     if (event.metadata?.langgraph_node !== "orchestrator") continue;
@@ -45,10 +58,20 @@ export async function streamAgent(
       Array.isArray(chunk.tool_call_chunks) && chunk.tool_call_chunks.length > 0;
 
     if (content && !hasToolCallChunks) {
+      if (!responseStepStarted) {
+        bus.publish({ type: "agent_step", platform: null, label: "Generating response", stepStatus: "running" });
+        responseStepStarted = true;
+      }
       fullContent += content;
       bus.publish({ type: "text_delta", delta: content });
     }
   }
+
+  if (responseStepStarted) {
+    bus.publish({ type: "agent_step", platform: null, label: "Generating response", stepStatus: "done" });
+  }
+
+  await resolveCitations(threadId, fullContent, bus);
 
   return fullContent;
 }
