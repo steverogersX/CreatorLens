@@ -12,12 +12,19 @@ let _threadId: string | null = null;
 let _buffer: LiveEvent[] = [];
 let _listeners = new Set<Listener>();
 let _done = false;
+let _userMessage = "";
 
-export function initStream(threadId: string): void {
+export function initStream(threadId: string, userMessage = ""): void {
   _threadId = threadId;
   _buffer = [];
   _listeners = new Set();
   _done = false;
+  _userMessage = userMessage;
+}
+
+/** The user message that kicked off this stream — used to render/commit the user bubble on the thread page. */
+export function getStreamUserMessage(threadId: string): string {
+  return _threadId === threadId ? _userMessage : "";
 }
 
 export function pushStreamEvent(event: LiveEvent): void {
