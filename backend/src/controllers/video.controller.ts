@@ -3,7 +3,7 @@ import { fromZodError } from "zod-validation-error";
 import { analyzeVideosSchema } from "@/schemas/video.schema";
 import { BadRequestError } from "@/errors/app-error";
 import { analyzeVideosStreaming } from "@/services/video.service";
-import { getThreadData, saveMessages, threadExists, updateThreadStatus } from "@/db/persist";
+import { getThreadData, listThreads, saveMessages, threadExists, updateThreadStatus } from "@/db/persist";
 import { streamAgent } from "@/agent";
 import { StatusCodes } from "http-status-codes";
 import { openSSE, writeSSE } from "@/lib/sse";
@@ -62,6 +62,11 @@ export async function chatStream(req: Request, res: Response, next: NextFunction
   } finally {
     res.end();
   }
+}
+
+export async function getThreads(_req: Request, res: Response): Promise<void> {
+  const threads = await listThreads();
+  res.status(StatusCodes.OK).json({ data: threads });
 }
 
 export async function getThread(req: Request, res: Response): Promise<void> {

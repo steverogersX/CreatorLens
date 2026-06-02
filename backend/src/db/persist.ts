@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "./client";
 import {
   threads,
@@ -112,7 +112,14 @@ export async function saveMessages(
   messages: Array<{ role: string; content: string }>,
 ): Promise<void> {
   if (messages.length === 0) return;
-  await db.insert(chatMessages).values(messages.map((m) => ({ threadId, ...m })));
+  // A single INSERT shares one statement timestamp, so relying on the column
+  // default would give every row in the turn an identical created_at and make
+  // ordering (history replay + UI render) non-deterministic. Stamp each row
+  // with a strictly increasing time to preserve turn order.
+  const base = Date.now();
+  await db.insert(chatMessages).values(
+    messages.map((m, i) => ({ threadId, ...m, createdAt: new Date(base + i) })),
+  );
 }
 
 export async function getThreadData(threadId: string): Promise<ThreadData | null> {
@@ -157,6 +164,67 @@ export async function getThreadData(threadId: string): Promise<ThreadData | null
     videos: videoRows,
     messages: messageRows,
   };
+}
+
+export interface ThreadSummary {
+  threadId: string;
+  title: string;
+  videoTitles: string[];
+  status: ThreadStatus;
+  createdAt: Date;
+}
+
+/** Recent threads for the history sidebar, newest first. */
+export async function listThreads(limit = 50): Promise<ThreadSummary[]> {
+  const threadRows = await db
+    .select({ id: threads.id, status: threads.status, createdAt: threads.createdAt })
+    .from(threads)
+    .orderBy(desc(threads.createdAt))
+    .limit(limit);
+
+  if (threadRows.length === 0) return [];
+
+  const ids = threadRows.map((t) => t.id);
+
+  const [messageRows, videoRows] = await Promise.all([
+    db
+      .select({ threadId: chatMessages.threadId, content: chatMessages.content, createdAt: chatMessages.createdAt })
+      .from(chatMessages)
+      .where(and(inArray(chatMessages.threadId, ids), eq(chatMessages.role, "user")))
+      .orderBy(asc(chatMessages.createdAt)),
+    db
+      .select({ threadId: videoMeta.threadId, title: videoMeta.title, position: videoMeta.position })
+      .from(videoMeta)
+      .where(inArray(videoMeta.threadId, ids))
+      .orderBy(asc(videoMeta.position)),
+  ]);
+
+  // First user message per thread → conversation title.
+  const firstUserMessage = new Map<string, string>();
+  for (const row of messageRows) {
+    if (!firstUserMessage.has(row.threadId)) firstUserMessage.set(row.threadId, row.content);
+  }
+
+  const titlesByThread = new Map<string, string[]>();
+  for (const row of videoRows) {
+    const arr = titlesByThread.get(row.threadId) ?? [];
+    arr.push(row.title);
+    titlesByThread.set(row.threadId, arr);
+  }
+
+  return threadRows.map((t) => {
+    const videoTitles = titlesByThread.get(t.id) ?? [];
+    const title =
+      firstUserMessage.get(t.id) ??
+      (videoTitles.length > 0 ? videoTitles.join("  vs  ") : "New comparison");
+    return {
+      threadId: t.id,
+      title,
+      videoTitles,
+      status: t.status as ThreadStatus,
+      createdAt: t.createdAt,
+    };
+  });
 }
 
 export async function threadExists(threadId: string): Promise<boolean> {
