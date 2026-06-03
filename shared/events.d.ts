@@ -40,5 +40,6 @@ export type ChatSSEEvent =
   | { type: "agent_step"; platform: string | null, label: string; stepStatus: AgentStepStatus }
   | { type: "text_delta"; delta: string }
   | { type: "citations"; citations: CitationPayload[] }
+  | { type: "suggestions"; questions: string[] }
   | { type: "error"; message: string }
   | { type: "done" };

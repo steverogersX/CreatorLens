@@ -106,12 +106,14 @@ export function ConversationPanel({
   const [liveSteps, setLiveSteps] = useState<AgentStep[]>([]);
   const [liveText, setLiveText] = useState("");
   const [liveCitations, setLiveCitations] = useState<CitationPayload[]>([]);
+  const [liveSuggestions, setLiveSuggestions] = useState<string[]>([]);
 
   // Refs mirror the live state so the `done`/`error` commit reads the latest
   // values regardless of React batching.
   const liveTextRef = useRef("");
   const liveStepsRef = useRef<AgentStep[]>([]);
   const liveCitationsRef = useRef<CitationPayload[]>([]);
+  const liveSuggestionsRef = useRef<string[]>([]);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const liveCitationsMap = useMemo(() => {
@@ -137,6 +139,7 @@ export function ConversationPanel({
     liveTextRef.current = "";
     liveStepsRef.current = [];
     liveCitationsRef.current = [];
+    liveSuggestionsRef.current = [];
 
     // Move the finished live result into the useChat message list so the
     // conversation continues seamlessly — no server round-trip, no remount.
@@ -174,9 +177,13 @@ export function ConversationPanel({
       setLiveSteps([]);
       setLiveText("");
       setLiveCitations([]);
+      // liveSuggestions intentionally not cleared — stays visible after streaming ends
       liveTextRef.current = "";
       liveStepsRef.current = [];
       liveCitationsRef.current = [];
+      if (liveSuggestionsRef.current.length > 0) {
+        setLiveSuggestions(liveSuggestionsRef.current);
+      }
     };
 
     const unsub = subscribeStream(threadId, (event) => {
@@ -208,6 +215,10 @@ export function ConversationPanel({
         case "citations":
           liveCitationsRef.current = event.citations;
           setLiveCitations(event.citations);
+          break;
+
+        case "suggestions":
+          liveSuggestionsRef.current = event.questions;
           break;
 
         case "done":
@@ -251,6 +262,22 @@ export function ConversationPanel({
     () => messages.filter((m) => m.role === "assistant").at(-1)?.id,
     [messages],
   );
+
+  // Dynamic suggestions from the last AI response. For useChat follow-ups the
+  // suggestions arrive as a `data-suggestions` part on the assistant message.
+  // For the initial live stream they arrive via the SSE subscriber above.
+  // Fall back to the static list only when neither source has produced anything.
+  const suggestions = useMemo(() => {
+    const lastAssistant = messages.filter((m) => m.role === "assistant").at(-1);
+    if (lastAssistant) {
+      const part = lastAssistant.parts.find((p) => p.type === "data-suggestions") as
+        | { type: string; data: { questions: string[] } }
+        | undefined;
+      if (part?.data.questions.length) return part.data.questions;
+    }
+    if (liveSuggestions.length > 0) return liveSuggestions;
+    return SUGGESTED;
+  }, [messages, liveSuggestions]);
 
   const getMessageText = useCallback(
     (id: string) =>
@@ -392,7 +419,7 @@ export function ConversationPanel({
       <div className="shrink-0 px-5 sm:px-6 pb-6 pt-1">
         <div className="max-w-2xl mx-auto flex flex-col gap-3">
           {!liveStreaming && (
-            <SuggestedQuestions questions={SUGGESTED} onSelect={(q) => setInput(q)} />
+            <SuggestedQuestions questions={suggestions} onSelect={(q) => setInput(q)} />
           )}
           <div
             className={cn(

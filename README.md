@@ -1,5 +1,7 @@
 # CreatorLens
 
+**▶️ [Watch the live demo (Loom)](https://www.loom.com/share/9fb58b95ac014a1fb4db47ab72cf3da9)**
+
 Paste two short-form videos, ask a question, get a real answer with timestamps.
 
 That's the whole pitch. You drop in a YouTube link and an Instagram Reel (or an X post), and you can ask things like "which one explains the hook better?" or "what does the second video say about pricing?" — and the answer comes back streaming, with little `[A:1:23]` style citations you can click to jump to the exact moment in the transcript. It's built for creators who want to compare how two pieces of content actually land, not just stare at view counts.
