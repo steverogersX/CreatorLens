@@ -13,9 +13,11 @@ export interface IVideoMeta {
   title: string;
   description?: string;
   url: string;
+  thumbnailUrl?: string;
   views: number;
   likes: number;
   commentCount: number;
+  retweets?: number;
   creator: VideoCreator;
   hashtags: string[];
   uploadDate: Date;

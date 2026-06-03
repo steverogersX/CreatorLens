@@ -66,9 +66,11 @@ export async function persistVideoAnalysis(
       position,
       title: meta.title,
       description: meta.description ?? null,
+      thumbnailUrl: meta.thumbnailUrl ?? null,
       views: meta.views,
       likes: meta.likes,
       commentCount: meta.commentCount,
+      retweets: meta.retweets ?? null,
       creatorId: meta.creator.id,
       creatorName: meta.creator.name,
       creatorHandle: meta.creator.handle,
@@ -162,6 +164,8 @@ export async function getThreadData(threadId: string): Promise<ThreadData | null
         creatorName: videoMeta.creatorName,
         creatorHandle: videoMeta.creatorHandle,
         creatorFollowerCount: videoMeta.creatorFollowerCount,
+        thumbnailUrl: videoMeta.thumbnailUrl,
+        retweets: videoMeta.retweets,
         duration: videoMeta.duration,
       })
       .from(videoMeta)
@@ -279,6 +283,7 @@ export async function persistThread(analyses: VideoAnalysis[]): Promise<string> 
         position,
         title: meta.title,
         description: meta.description ?? null,
+        thumbnailUrl: meta.thumbnailUrl ?? null,
         views: meta.views,
         likes: meta.likes,
         commentCount: meta.commentCount,

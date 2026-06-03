@@ -1,0 +1,1 @@
+ALTER TABLE "video_meta" ADD COLUMN "thumbnail_url" text;

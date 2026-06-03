@@ -84,6 +84,9 @@ function videoRowToData(row: ThreadVideoRow, label: "A" | "B", accent: VideoAcce
     comments: row.commentCount.toLocaleString(),
     duration: `${Math.floor(row.duration / 60)}:${String(Math.floor(row.duration % 60)).padStart(2, "0")}`,
     engagementRate: row.views > 0 ? parseFloat(((row.likes / row.views) * 100).toFixed(1)) : 0,
+    thumbnailUrl: row.thumbnailUrl ?? undefined,
+    sourceUrl: row.url,
+    retweets: row.retweets != null ? row.retweets.toLocaleString() : undefined,
   };
 }
 

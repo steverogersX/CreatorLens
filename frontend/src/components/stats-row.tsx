@@ -10,10 +10,11 @@ interface StatsRowProps {
   likes: string;
   comments: string;
   duration: string;
+  retweets?: string;
   platform?: "youtube" | "instagram" | "twitter";
 }
 
-type StatKey = "views" | "likes" | "comments" | "duration";
+type StatKey = "views" | "likes" | "comments" | "duration" | "retweets";
 
 interface StatDef {
   key: StatKey;
@@ -41,12 +42,12 @@ const PLATFORM_STATS: Record<"youtube" | "instagram" | "twitter", StatDef[]> = {
     { key: "views",    Icon: BarChart2,     label: "Impressions", iconClass: ICON_CLASS },
     { key: "likes",    Icon: Heart,         label: "Likes",       iconClass: ICON_CLASS },
     { key: "comments", Icon: MessageSquare, label: "Replies",     iconClass: ICON_CLASS },
-    { key: "duration", Icon: Repeat2,       label: "Retweets",    iconClass: ICON_CLASS },
+    { key: "retweets", Icon: Repeat2,       label: "Retweets",    iconClass: ICON_CLASS },
   ],
 };
 
-export function StatsRow({ views, likes, comments, duration, platform = "youtube" }: StatsRowProps) {
-  const values: Record<StatKey, string> = { views, likes, comments, duration };
+export function StatsRow({ views, likes, comments, duration, retweets, platform = "youtube" }: StatsRowProps) {
+  const values: Record<StatKey, string> = { views, likes, comments, duration, retweets: retweets ?? "—" };
   const stats = PLATFORM_STATS[platform];
 
   return (
