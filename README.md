@@ -1,6 +1,6 @@
 # CreatorLens
 
-**▶️ [Watch the live demo (Loom)](https://www.loom.com/share/9fb58b95ac014a1fb4db47ab72cf3da9)**
+[![CreatorLens demo](https://cdn.loom.com/sessions/thumbnails/9fb58b95ac014a1fb4db47ab72cf3da9-with-play.gif)](https://www.loom.com/share/9fb58b95ac014a1fb4db47ab72cf3da9)
 
 Paste two short-form videos, ask a question, get a real answer with timestamps.
 
